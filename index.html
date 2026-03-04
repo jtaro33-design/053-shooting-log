@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>053 Shooting Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@400;700;900&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-dark: #1E3A1E;
+    --green-mid: #2D4A2D;
+    --green-light: #3D5C3D;
+    --green-accent: #4A7A4A;
+    --gold: #C8A870;
+    --gold-light: #DBBF8A;
+    --gold-dim: rgba(200,168,112,0.3);
+    --court-wood: #C8944A;
+    --court-wood-light: #D4A45C;
+    --court-wood-dark: #A87A3A;
+    --court-line: rgba(255,255,255,0.88);
+    --white: #F5F0E8;
+    --white-pure: #FFFFFF;
+    --text: #F5F0E8;
+    --text-dim: #8A9A8A;
+    --card-bg: rgba(255,255,255,0.07);
+    --success: #5CB85C;
+    --danger: #D9534F;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: linear-gradient(180deg, var(--green-dark) 0%, #152615 100%);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    background: linear-gradient(135deg, var(--green-dark), var(--green-mid));
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 3px solid var(--gold);
+  }
+  .header .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+  .header .subtitle {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 1px;
+    letter-spacing: 1px;
+  }
+
+  .steps {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 20px 4px;
+  }
+  .step-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    transition: all 0.3s;
+  }
+  .step-line {
+    width: 24px; height: 2px;
+    background: rgba(255,255,255,0.1);
+    transition: all 0.3s;
+  }
+  .step-line.done { background: var(--success); }
+  .step-dot.active {
+    background: var(--gold);
+    box-shadow: 0 0 10px rgba(200,168,112,0.5);
+    transform: scale(1.3);
+  }
+  .step-dot.done { background: var(--success); }
+  .step-label {
+    text-align: center;
+    font-size: 12px;
+    color: var(--gold);
+    padding: 6px 0 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .screen {
+    display: none;
+    padding: 0 16px 24px;
+    animation: fadeIn 0.3s ease;
+  }
+  .screen.active { display: block; }
+  @keyframes fadeIn {
+    from { opacity:0; transform:translateY(10px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+
+  /* ===== Court ===== */
+  .court-wrapper {
+    max-width: 360px;
+    margin: 0 auto;
+  }
+  .court-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 50 / 47;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .court-floor {
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        var(--court-wood) 0px,
+        var(--court-wood-light) 8px,
+        var(--court-wood) 16px,
+        var(--court-wood-dark) 24px,
+        var(--court-wood) 32px
+      );
+    border: 3px solid var(--court-line);
+    border-radius: 10px;
+  }
+  .court-lines {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+  }
+  .court-lines svg {
+    width: 100%;
+    height: 100%;
+  }
+  .court-grid {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 2px;
+    padding: 3px;
+    z-index: 10;
+  }
+  .grid-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    color: rgba(255,255,255,0.55);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: rgba(0,0,0,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .grid-cell:active { transform: scale(0.92); }
+  .grid-cell.selected {
+    background: rgba(45,74,45,0.6);
+    border: 2px solid var(--gold);
+    color: var(--white-pure);
+    font-size: 16px;
+    box-shadow: 0 0 14px rgba(200,168,112,0.4), inset 0 0 8px rgba(200,168,112,0.15);
+  }
+
+  /* ===== Shot Type ===== */
+  .shot-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    max-width: 360px;
+    margin: 0 auto;
+  }
+  .shot-btn {
+    background: var(--card-bg);
+    border: 2px solid rgba(200,168,112,0.12);
+    border-radius: 14px;
+    padding: 16px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .shot-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--gold);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .shot-btn:active { transform: scale(0.95); }
+  .shot-btn.selected {
+    border-color: var(--gold);
+    background: rgba(200,168,112,0.1);
+    box-shadow: 0 0 20px rgba(200,168,112,0.15);
+  }
+  .shot-btn.selected::before { opacity: 1; }
+  .shot-lv {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 30px;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .shot-name {
+    font-size: 14px;
+    color: var(--text);
+    margin-top: 4px;
+    font-weight: 900;
+  }
+  .shot-desc {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ===== Input ===== */
+  .input-section {
+    max-width: 360px;
+    margin: 0 auto;
+  }
+  .selected-summary {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-around;
+    border: 1px solid rgba(200,168,112,0.15);
+  }
+  .summary-item { text-align: center; }
+  .summary-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .summary-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    color: var(--gold);
+    margin-top: 2px;
+  }
+  .number-group { margin-bottom: 20px; }
+  .number-label {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .number-input-wrap {
+    position: relative;
+    max-width: 200px;
+    margin: 0 auto;
+  }
+  .number-input {
+    width: 100%;
+    text-align: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    color: var(--white-pure);
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(200,168,112,0.2);
+    border-radius: 12px;
+    padding: 10px 16px;
+    outline: none;
+    -moz-appearance: textfield;
+    transition: border-color 0.2s;
+  }
+  .number-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 12px rgba(200,168,112,0.2);
+  }
+  .number-input::-webkit-outer-spin-button,
+  .number-input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .number-error {
+    font-size: 11px;
+    color: var(--danger);
+    text-align: center;
+    margin-top: 4px;
+    display: none;
+  }
+
+  /* ===== Memo ===== */
+  .memo-section { max-width: 360px; margin: 0 auto; }
+  .memo-summary {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(200,168,112,0.15);
+  }
+  .memo-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+  }
+  .memo-summary-label { font-size: 12px; color: var(--text-dim); }
+  .memo-summary-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: var(--gold);
+  }
+  .memo-textarea {
+    width: 100%;
+    min-height: 120px;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(200,168,112,0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s;
+  }
+  .memo-textarea::placeholder { color: var(--text-dim); }
+  .memo-textarea:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 12px rgba(200,168,112,0.2);
+  }
+  .memo-label { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--text); }
+  .memo-skip { font-size: 12px; color: var(--text-dim); text-align: center; margin-top: 6px; }
+
+  /* ===== Buttons ===== */
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    max-width: 360px;
+    margin: 20px auto 0;
+  }
+  .btn {
+    flex: 1;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    user-select: none;
+    -webkit-user-select: none;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-back {
+    background: var(--card-bg);
+    color: var(--text-dim);
+    border: 1px solid rgba(255,255,255,0.1);
+    flex: 0.5;
+  }
+  .btn-next {
+    background: linear-gradient(135deg, var(--green-mid), var(--green-accent));
+    color: var(--gold);
+    border: 2px solid var(--gold-dim);
+    box-shadow: 0 4px 16px rgba(45,74,45,0.4);
+  }
+  .btn-next:disabled { opacity: 0.3; box-shadow: none; cursor: default; }
+  .btn-submit {
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    color: var(--green-dark);
+    font-weight: 900;
+    box-shadow: 0 4px 16px rgba(200,168,112,0.35);
+  }
+
+  /* ===== Success ===== */
+  .success-screen {
+    text-align: center;
+    padding-top: 32px;
+    max-width: 360px;
+    margin: 0 auto;
+  }
+  .success-icon {
+    font-size: 56px;
+    margin-bottom: 12px;
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes popIn {
+    from { transform: scale(0); } to { transform: scale(1); }
+  }
+  .success-badge {
+    display: inline-block;
+    background: var(--card-bg);
+    border: 2px solid var(--gold);
+    border-radius: 16px;
+    padding: 24px 32px;
+    margin-bottom: 20px;
+  }
+  .success-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+  .success-rate-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+  .success-rate {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 56px;
+    color: var(--white-pure);
+    line-height: 1;
+    margin-top: 4px;
+  }
+  .success-detail {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 16px;
+    line-height: 2;
+  }
+  .success-detail strong { color: var(--gold); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">053 SHOOTING LOG</div>
+    <div class="subtitle">DEVELOPMENT ACADEMY</div>
+  </div>
+</div>
+
+<div class="steps">
+  <div class="step-dot active" id="dot1"></div>
+  <div class="step-line" id="line1"></div>
+  <div class="step-dot" id="dot2"></div>
+  <div class="step-line" id="line2"></div>
+  <div class="step-dot" id="dot3"></div>
+  <div class="step-line" id="line3"></div>
+  <div class="step-dot" id="dot4"></div>
+</div>
+<div class="step-label" id="stepLabel">STEP 1 ─ エリアを選択</div>
+
+<!-- Screen 1: Court -->
+<div class="screen active" id="screen1">
+  <div class="court-wrapper">
+    <div class="court-container">
+      <div class="court-floor"></div>
+
+      <div class="court-lines">
+        <svg viewBox="0 0 500 470" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+
+          <!-- Boundary -->
+          <line x1="0" y1="467" x2="500" y2="467" stroke="white" stroke-width="3" opacity="0.85"/>
+          <line x1="3" y1="0" x2="3" y2="470" stroke="white" stroke-width="3" opacity="0.85"/>
+          <line x1="497" y1="0" x2="497" y2="470" stroke="white" stroke-width="3" opacity="0.85"/>
+          <line x1="0" y1="3" x2="500" y2="3" stroke="white" stroke-width="3" opacity="0.85"/>
+
+          <!-- Center circle: half-circle on top half-court line (A row top = y:3) -->
+          <path d="M 190 3 A 60 60 0 0 1 310 3" stroke="white" stroke-width="2.5" fill="none" opacity="0.75"/>
+
+          <!-- Paint / Key (bottom, D row side) -->
+          <rect x="150" y="312" width="200" height="158" stroke="white" stroke-width="2.5" fill="none" opacity="0.8"/>
+
+          <!-- Free throw circle -->
+          <path d="M 200 312 A 50 50 0 0 1 300 312" stroke="white" stroke-width="2" fill="none" opacity="0.7"/>
+          <path d="M 200 312 A 50 50 0 0 0 300 312" stroke="white" stroke-width="2" fill="none" opacity="0.35" stroke-dasharray="8 6"/>
+
+          <!-- Key hash marks -->
+          <line x1="140" y1="345" x2="150" y2="345" stroke="white" stroke-width="2" opacity="0.5"/>
+          <line x1="140" y1="380" x2="150" y2="380" stroke="white" stroke-width="2" opacity="0.5"/>
+          <line x1="140" y1="415" x2="150" y2="415" stroke="white" stroke-width="2" opacity="0.5"/>
+          <line x1="350" y1="345" x2="360" y2="345" stroke="white" stroke-width="2" opacity="0.5"/>
+          <line x1="350" y1="380" x2="360" y2="380" stroke="white" stroke-width="2" opacity="0.5"/>
+          <line x1="350" y1="415" x2="360" y2="415" stroke="white" stroke-width="2" opacity="0.5"/>
+
+          <!-- Restricted area (bottom) -->
+          <path d="M 210 470 A 40 40 0 0 1 290 470" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
+
+          <!-- Backboard (bottom, closer to endline) -->
+          <line x1="222" y1="445" x2="278" y2="445" stroke="white" stroke-width="3.5" opacity="0.85"/>
+
+          <!-- Rim: circle above backboard (seen from above, ring opens toward court/upward) -->
+          <circle cx="250" cy="435" r="10" stroke="white" stroke-width="2.5" fill="rgba(200,168,112,0.3)" opacity="0.9"/>
+
+          <!-- 3-Point Line (bottom) -->
+          <line x1="30" y1="470" x2="30" y2="330" stroke="white" stroke-width="2.5" opacity="0.8"/>
+          <path d="M 30 330 A 238 238 0 0 1 470 330" stroke="white" stroke-width="2.5" fill="none" opacity="0.8"/>
+          <line x1="470" y1="330" x2="470" y2="470" stroke="white" stroke-width="2.5" opacity="0.8"/>
+
+
+
+        </svg>
+      </div>
+
+      <div class="court-grid" id="courtGrid"></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-next" id="btnNext1" disabled onclick="goToScreen(2)">次へ →</button>
+  </div>
+</div>
+
+<!-- Screen 2: Shot Type -->
+<div class="screen" id="screen2">
+  <div class="shot-grid">
+    <div class="shot-btn" data-type="LV1" onclick="selectShot(this)">
+      <div class="shot-lv">LV1</div>
+      <div class="shot-name">リム</div>
+      <div class="shot-desc">レイアップ等</div>
+    </div>
+    <div class="shot-btn" data-type="LV2" onclick="selectShot(this)">
+      <div class="shot-lv">LV2</div>
+      <div class="shot-name">フローター</div>
+      <div class="shot-desc">ランナー</div>
+    </div>
+    <div class="shot-btn" data-type="LV3" onclick="selectShot(this)">
+      <div class="shot-lv">LV3</div>
+      <div class="shot-name">ミドル</div>
+      <div class="shot-desc">ミッドレンジ</div>
+    </div>
+    <div class="shot-btn" data-type="LV4" onclick="selectShot(this)">
+      <div class="shot-lv">LV4</div>
+      <div class="shot-name">3P</div>
+      <div class="shot-desc">スリーポイント</div>
+    </div>
+    <div class="shot-btn" data-type="LV5" onclick="selectShot(this)">
+      <div class="shot-lv">LV5</div>
+      <div class="shot-name">DEEP 3P</div>
+      <div class="shot-desc">ディープスリー</div>
+    </div>
+    <div class="shot-btn" data-type="LV6" onclick="selectShot(this)">
+      <div class="shot-lv">LV6</div>
+      <div class="shot-name">FT</div>
+      <div class="shot-desc">フリースロー</div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-back" onclick="goToScreen(1)">← 戻る</button>
+    <button class="btn btn-next" id="btnNext2" disabled onclick="goToScreen(3)">次へ →</button>
+  </div>
+</div>
+
+<!-- Screen 3: Number Input -->
+<div class="screen" id="screen3">
+  <div class="input-section">
+    <div class="selected-summary">
+      <div class="summary-item">
+        <div class="summary-label">AREA</div>
+        <div class="summary-value" id="summaryArea">-</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">SHOT</div>
+        <div class="summary-value" id="summaryShot">-</div>
+      </div>
+    </div>
+    <div class="number-group">
+      <div class="number-label">試投数（シュートした数）</div>
+      <div class="number-input-wrap">
+        <input type="number" class="number-input" id="attemptsInput" value="" placeholder="0"
+               min="0" max="999" inputmode="numeric" oninput="validateNumbers()">
+      </div>
+    </div>
+    <div class="number-group">
+      <div class="number-label">成功数（入った数）</div>
+      <div class="number-input-wrap">
+        <input type="number" class="number-input" id="madeInput" value="" placeholder="0"
+               min="0" max="999" inputmode="numeric" oninput="validateNumbers()">
+        <div class="number-error" id="madeError">成功数は試投数以下にしてください</div>
+      </div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-back" onclick="goToScreen(2)">← 戻る</button>
+    <button class="btn btn-next" id="btnNext3" disabled onclick="goToScreen(4)">次へ →</button>
+  </div>
+</div>
+
+<!-- Screen 4: Memo -->
+<div class="screen" id="screen4">
+  <div class="memo-section">
+    <div class="memo-summary">
+      <div class="memo-summary-row">
+        <span class="memo-summary-label">エリア</span>
+        <span class="memo-summary-val" id="memoArea">-</span>
+      </div>
+      <div class="memo-summary-row">
+        <span class="memo-summary-label">シュート種類</span>
+        <span class="memo-summary-val" id="memoShot">-</span>
+      </div>
+      <div class="memo-summary-row">
+        <span class="memo-summary-label">結果</span>
+        <span class="memo-summary-val" id="memoResult">-</span>
+      </div>
+    </div>
+    <div class="memo-label">メモ（任意）</div>
+    <textarea class="memo-textarea" id="memoText" placeholder="気づいたことがあれば入力&#10;例：フォームを意識して打った、疲れていた等"></textarea>
+    <div class="memo-skip">※ 空欄のまま送信してもOKです</div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-back" onclick="goToScreen(3)">← 戻る</button>
+    <button class="btn btn-submit" onclick="submitLog()">記録する ✓</button>
+  </div>
+</div>
+
+<!-- Screen 5: Success -->
+<div class="screen" id="screen5">
+  <div class="success-screen">
+    <div class="success-icon">🏀</div>
+    <div class="success-badge">
+      <div class="success-title">RECORDED!</div>
+      <div class="success-rate-label">SUCCESS RATE</div>
+      <div class="success-rate" id="successRate">-</div>
+    </div>
+    <div class="success-detail" id="successDetail"></div>
+    <div class="btn-row" style="justify-content:center; margin-top: 24px;">
+      <button class="btn btn-next" onclick="resetAll()" style="max-width:220px;">もう1セット記録する →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let selectedArea = null;
+  let selectedShot = null;
+
+  const rows = ['A','B','C','D'];
+  const cols = [1,2,3,4,5];
+  const grid = document.getElementById('courtGrid');
+
+  rows.forEach(row => {
+    cols.forEach(col => {
+      const cell = document.createElement('div');
+      cell.className = 'grid-cell';
+      cell.dataset.area = row + col;
+      cell.textContent = row + col;
+      cell.onclick = () => selectArea(cell);
+      grid.appendChild(cell);
+    });
+  });
+
+  function selectArea(cell) {
+    document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected'));
+    cell.classList.add('selected');
+    selectedArea = cell.dataset.area;
+    document.getElementById('btnNext1').disabled = false;
+  }
+
+  function selectShot(btn) {
+    document.querySelectorAll('.shot-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedShot = btn.dataset.type;
+    document.getElementById('btnNext2').disabled = false;
+  }
+
+  function validateNumbers() {
+    const attemptsEl = document.getElementById('attemptsInput');
+    const madeEl = document.getElementById('madeInput');
+    const errorEl = document.getElementById('madeError');
+    const btnNext = document.getElementById('btnNext3');
+    let attempts = parseInt(attemptsEl.value) || 0;
+    let made = parseInt(madeEl.value) || 0;
+    if (attempts < 0) { attemptsEl.value = 0; attempts = 0; }
+    if (made < 0) { madeEl.value = 0; made = 0; }
+    if (made > attempts && attempts > 0) {
+      errorEl.style.display = 'block';
+      btnNext.disabled = true;
+    } else {
+      errorEl.style.display = 'none';
+      btnNext.disabled = !(attempts > 0);
+    }
+  }
+
+  function goToScreen(num) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen' + num).classList.add('active');
+    for (let i = 1; i <= 4; i++) {
+      const dot = document.getElementById('dot' + i);
+      dot.classList.remove('active','done');
+      if (i < num) dot.classList.add('done');
+      if (i === num) dot.classList.add('active');
+    }
+    for (let i = 1; i <= 3; i++) {
+      document.getElementById('line' + i).classList.toggle('done', i < num);
+    }
+    const labels = {
+      1: 'STEP 1 ─ エリアを選択',
+      2: 'STEP 2 ─ シュート種類を選択',
+      3: 'STEP 3 ─ 本数を入力',
+      4: 'STEP 4 ─ メモ（任意）'
+    };
+    document.getElementById('stepLabel').textContent = labels[num] || '';
+    if (num === 3) {
+      document.getElementById('summaryArea').textContent = selectedArea;
+      document.getElementById('summaryShot').textContent = selectedShot;
+    }
+    if (num === 4) {
+      const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
+      const made = parseInt(document.getElementById('madeInput').value) || 0;
+      document.getElementById('memoArea').textContent = selectedArea;
+      document.getElementById('memoShot').textContent = selectedShot;
+      document.getElementById('memoResult').textContent = made + ' / ' + attempts;
+    }
+  }
+
+  function submitLog() {
+    const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
+    const made = parseInt(document.getElementById('madeInput').value) || 0;
+    const memo = document.getElementById('memoText').value.trim();
+    if (attempts === 0) { alert('試投数を入力してください'); return; }
+    if (made > attempts) { alert('成功数が試投数を超えています'); return; }
+    const rate = Math.round((made / attempts) * 100);
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen5').classList.add('active');
+    document.getElementById('stepLabel').textContent = '';
+    document.querySelectorAll('.step-dot').forEach(d => { d.classList.remove('active'); d.classList.add('done'); });
+    document.querySelectorAll('.step-line').forEach(l => l.classList.add('done'));
+    document.getElementById('successRate').textContent = rate + '%';
+    document.getElementById('successDetail').innerHTML =
+      '<strong>' + selectedArea + '</strong> エリア ─ <strong>' + selectedShot + '</strong><br>' +
+      '<strong>' + made + '</strong> / <strong>' + attempts + '</strong>';
+  }
+
+  function resetAll() {
+    selectedArea = null;
+    selectedShot = null;
+    document.getElementById('attemptsInput').value = '';
+    document.getElementById('madeInput').value = '';
+    document.getElementById('memoText').value = '';
+    document.getElementById('madeError').style.display = 'none';
+    document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.shot-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('btnNext1').disabled = true;
+    document.getElementById('btnNext2').disabled = true;
+    document.getElementById('btnNext3').disabled = true;
+    goToScreen(1);
+  }
+</script>
+
+</body>
+</html>
