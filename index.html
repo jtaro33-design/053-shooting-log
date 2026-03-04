@@ -455,7 +455,7 @@
 <div class="step-label" id="stepLabel">STEP 1 ─ エリアを選択</div>
 
 <!-- Screen 1: Court -->
-<div class="screen active" id="screen1">
+<div class="screen" id="screen1">
   <div class="court-wrapper">
     <div class="court-container">
       <div class="court-floor"></div>
@@ -632,6 +632,43 @@
   </div>
 </div>
 
+<!-- Loading Screen -->
+<div class="screen active" id="screenLoading">
+  <div class="success-screen" style="padding-top:80px;">
+    <div style="font-size:48px; margin-bottom:20px;">🏀</div>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:28px; color:var(--gold); letter-spacing:3px;">053 SHOT TRACKER</div>
+    <div style="color:var(--text-dim); font-size:14px; margin-top:16px;">読み込み中...</div>
+  </div>
+</div>
+
+<!-- Registration Guide Screen -->
+<div class="screen" id="screenRegister">
+  <div class="success-screen" style="padding-top:40px;">
+    <div style="font-size:48px; margin-bottom:16px;">📋</div>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:28px; color:var(--gold); letter-spacing:3px;">REGISTRATION REQUIRED</div>
+    <div style="color:var(--text); font-size:15px; margin-top:20px; line-height:2;">
+      053 SHOT TRACKERをご利用いただくには<br>ユーザー登録が必要です。
+    </div>
+    <div style="background:var(--card-bg); border:1px solid rgba(200,168,112,0.2); border-radius:14px; padding:24px 20px; margin-top:24px; text-align:left; max-width:320px; margin-left:auto; margin-right:auto;">
+      <div style="font-size:13px; color:var(--gold); font-weight:700; margin-bottom:14px; text-align:center;">登録手順</div>
+      <div style="font-size:14px; color:var(--text); line-height:2.2;">
+        <span style="color:var(--gold); font-family:'Bebas Neue',sans-serif; font-size:18px;">1.</span> このアプリを閉じる<br>
+        <span style="color:var(--gold); font-family:'Bebas Neue',sans-serif; font-size:18px;">2.</span> LINEのトーク画面で<br>
+        　<span style="background:rgba(200,168,112,0.15); padding:2px 10px; border-radius:6px; font-weight:700;">登録 あなたの名前</span><br>
+        　と送信<br>
+        <span style="color:var(--gold); font-family:'Bebas Neue',sans-serif; font-size:18px;">3.</span> 管理者の承認後に利用可能
+      </div>
+    </div>
+    <div style="color:var(--text-dim); font-size:12px; margin-top:20px; line-height:1.8;">
+      ※ 承認には時間がかかる場合があります<br>
+      ※ ご不明点はトーク画面からお問い合わせください
+    </div>
+    <div class="btn-row" style="justify-content:center; margin-top:24px;">
+      <button class="btn btn-next" onclick="closeLiff()" style="max-width:220px;">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // ===== LIFF =====
   const LIFF_ID = '2009325083-qDkPrSGU';
@@ -647,12 +684,48 @@
     }
     liff.getProfile().then((profile) => {
       liffUserId = profile.userId;
+      checkUserStatus(profile.userId);
     }).catch((err) => {
       console.log('getProfile error:', err);
+      showScreen('screen1');
     });
   }).catch((err) => {
     console.log('LIFF init error:', err);
+    showScreen('screen1');
   });
+
+  function checkUserStatus(userId) {
+    fetch(GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId))
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'active') {
+          showScreen('screen1');
+          document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
+          document.querySelectorAll('.steps')[0].style.display = 'flex';
+        } else {
+          showScreen('screenRegister');
+          document.getElementById('stepLabel').textContent = '';
+          document.querySelectorAll('.steps')[0].style.display = 'none';
+        }
+      })
+      .catch((err) => {
+        console.log('checkUser error:', err);
+        showScreen('screen1');
+      });
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function closeLiff() {
+    if (liffReady && liff.isInClient()) {
+      liff.closeWindow();
+    } else {
+      window.close();
+    }
+  }
 
   let selectedArea = null;
   let selectedShot = null;
