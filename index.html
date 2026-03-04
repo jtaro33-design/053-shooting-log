@@ -695,23 +695,28 @@
   });
 
   function checkUserStatus(userId) {
-    fetch(GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId))
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === 'active') {
-          showScreen('screen1');
-          document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
-          document.querySelectorAll('.steps')[0].style.display = 'flex';
-        } else {
-          showScreen('screenRegister');
-          document.getElementById('stepLabel').textContent = '';
-          document.querySelectorAll('.steps')[0].style.display = 'none';
-        }
-      })
-      .catch((err) => {
-        console.log('checkUser error:', err);
+    var callbackName = 'userCheck_' + Date.now();
+    window[callbackName] = function(data) {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      if (data.status === 'active') {
         showScreen('screen1');
-      });
+        document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
+        document.querySelectorAll('.steps')[0].style.display = 'flex';
+      } else {
+        showScreen('screenRegister');
+        document.getElementById('stepLabel').textContent = '';
+        document.querySelectorAll('.steps')[0].style.display = 'none';
+      }
+    };
+    var script = document.createElement('script');
+    script.src = GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId) + '&callback=' + callbackName;
+    script.onerror = function() {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      showScreen('screen1');
+    };
+    document.body.appendChild(script);
   }
 
   function showScreen(id) {
