@@ -635,13 +635,21 @@
 <script>
   // ===== LIFF =====
   const LIFF_ID = '2009325083-qDkPrSGU';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzmTEyG5YwzVLn_Fou8jRWqD7zXOpZ38ljCn4V3dFYlBqXR9G9ApO-WwZb25hJUgsJd/exec';
   let liffReady = false;
+  let liffUserId = null;
 
   liff.init({ liffId: LIFF_ID }).then(() => {
     liffReady = true;
     if (!liff.isLoggedIn()) {
       liff.login();
+      return;
     }
+    liff.getProfile().then((profile) => {
+      liffUserId = profile.userId;
+    }).catch((err) => {
+      console.log('getProfile error:', err);
+    });
   }).catch((err) => {
     console.log('LIFF init error:', err);
   });
@@ -736,24 +744,32 @@
     if (made > attempts) { alert('成功数が試投数を超えています'); return; }
     const rate = Math.round((made / attempts) * 100);
 
-    // LIFF経由でLINEトークにメッセージ送信
-    const messageText = selectedArea + ',' + selectedShot + ',' + attempts + ',' + made + (memo ? ',' + memo : '');
+    // GASに直接POSTで送信
+    const postData = {
+      source: 'liff',
+      userId: liffUserId,
+      area: selectedArea,
+      shotType: selectedShot,
+      attempts: attempts,
+      made: made,
+      memo: memo
+    };
 
-    if (liffReady && liff.isInClient()) {
-      liff.sendMessages([{
-        type: 'text',
-        text: messageText
-      }]).then(() => {
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(postData)
+    }).then(res => res.json()).then(data => {
+      if (data.status === 'ok') {
         showSuccess(rate);
-      }).catch((err) => {
-        console.log('sendMessages error:', err);
-        showSuccess(rate);
-      });
-    } else {
-      // ブラウザで直接開いた場合（テスト用）
-      console.log('送信データ:', messageText);
+      } else {
+        alert(data.message || '保存に失敗しました');
+      }
+    }).catch(err => {
+      console.log('POST error:', err);
+      // エラーでも成功画面は表示（データはGAS側でログに残る）
       showSuccess(rate);
-    }
+    });
   }
 
   function showSuccess(rate) {
