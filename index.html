@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>053 Shooting Log</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@400;700;900&family=Oswald:wght@700&display=swap" rel="stylesheet">
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
   :root {
     --green-dark: #1E3A1E;
@@ -632,6 +633,19 @@
 </div>
 
 <script>
+  // ===== LIFF =====
+  const LIFF_ID = '2009325083-qDkPrSGU';
+  let liffReady = false;
+
+  liff.init({ liffId: LIFF_ID }).then(() => {
+    liffReady = true;
+    if (!liff.isLoggedIn()) {
+      liff.login();
+    }
+  }).catch((err) => {
+    console.log('LIFF init error:', err);
+  });
+
   let selectedArea = null;
   let selectedShot = null;
 
@@ -721,6 +735,30 @@
     if (attempts === 0) { alert('試投数を入力してください'); return; }
     if (made > attempts) { alert('成功数が試投数を超えています'); return; }
     const rate = Math.round((made / attempts) * 100);
+
+    // LIFF経由でLINEトークにメッセージ送信
+    const messageText = selectedArea + ',' + selectedShot + ',' + attempts + ',' + made + (memo ? ',' + memo : '');
+
+    if (liffReady && liff.isInClient()) {
+      liff.sendMessages([{
+        type: 'text',
+        text: messageText
+      }]).then(() => {
+        showSuccess(rate);
+      }).catch((err) => {
+        console.log('sendMessages error:', err);
+        showSuccess(rate);
+      });
+    } else {
+      // ブラウザで直接開いた場合（テスト用）
+      console.log('送信データ:', messageText);
+      showSuccess(rate);
+    }
+  }
+
+  function showSuccess(rate) {
+    const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
+    const made = parseInt(document.getElementById('madeInput').value) || 0;
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen5').classList.add('active');
     document.getElementById('stepLabel').textContent = '';
