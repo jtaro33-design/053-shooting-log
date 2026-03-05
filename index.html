@@ -36,6 +36,7 @@
     color: var(--text);
     min-height: 100vh;
     overflow-x: hidden;
+    padding-bottom: 70px;
   }
 
   .header {
@@ -438,13 +439,164 @@
     line-height: 2;
   }
   .success-detail strong { color: var(--gold); font-weight: 700; }
+
+  /* ===== Bottom Nav ===== */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    background: linear-gradient(0deg, var(--green-dark), rgba(30,58,30,0.97));
+    border-top: 2px solid rgba(200,168,112,0.2);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-btn {
+    flex: 1;
+    padding: 10px 0 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+    border: none;
+    background: none;
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  .nav-btn:active { opacity: 0.7; }
+  .nav-icon { font-size: 22px; }
+  .nav-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 1px;
+  }
+  .nav-btn.active .nav-label { color: var(--gold); }
+  .nav-btn.active .nav-icon { filter: drop-shadow(0 0 4px rgba(200,168,112,0.5)); }
+
+  /* Main content padding for nav */
+  .main-content {
+    padding-bottom: 70px;
+  }
+
+  /* ===== Trophy Screen ===== */
+  .trophy-page { display: none; padding: 0 16px 24px; }
+  .trophy-page.active { display: block; animation: fadeIn 0.3s ease; }
+
+  .trophy-stats {
+    display: flex;
+    gap: 8px;
+    max-width: 360px;
+    margin: 16px auto;
+  }
+  .trophy-stat-card {
+    flex: 1;
+    background: var(--card-bg);
+    border: 1px solid rgba(200,168,112,0.15);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .trophy-stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .trophy-stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+
+  .trophy-tabs {
+    display: flex;
+    gap: 6px;
+    max-width: 360px;
+    margin: 12px auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .trophy-tabs::-webkit-scrollbar { display: none; }
+  .trophy-tab {
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--card-bg);
+    color: var(--text-dim);
+    border: 1px solid rgba(255,255,255,0.06);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .trophy-tab.active {
+    background: rgba(200,168,112,0.15);
+    color: var(--gold);
+    border-color: rgba(200,168,112,0.3);
+  }
+
+  .trophy-list {
+    max-width: 360px;
+    margin: 12px auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .trophy-item {
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 14px 8px;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .trophy-item.unlocked {
+    border-color: rgba(200,168,112,0.25);
+    background: rgba(200,168,112,0.06);
+  }
+  .trophy-item.locked {
+    opacity: 0.35;
+  }
+  .trophy-emoji { font-size: 28px; }
+  .trophy-name {
+    font-size: 10px;
+    color: var(--text);
+    margin-top: 6px;
+    font-weight: 700;
+    line-height: 1.3;
+    min-height: 26px;
+  }
+  .trophy-item.locked .trophy-emoji { filter: grayscale(1); }
+  .trophy-item.locked .trophy-name { color: var(--text-dim); }
+
+  .trophy-count-badge {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    max-width: 360px;
+    margin: 8px auto 4px;
+  }
+  .trophy-count-badge strong { color: var(--gold); }
+
+  .trophy-loading {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
 </style>
 </head>
 <body>
 
 <div class="header">
   <div>
-    <div class="logo">053 SHOOTING LOG</div>
+    <div class="logo">053 SHOT TRACKER</div>
     <div class="subtitle">DEVELOPMENT ACADEMY</div>
   </div>
 </div>
@@ -675,6 +827,49 @@
   </div>
 </div>
 
+<!-- ===== Trophy Page ===== -->
+<div class="trophy-page" id="trophyPage">
+  <div class="trophy-stats" id="trophyStats">
+    <div class="trophy-stat-card">
+      <div class="trophy-stat-num" id="trophyTotalMakes">-</div>
+      <div class="trophy-stat-label">累計成功数</div>
+    </div>
+    <div class="trophy-stat-card">
+      <div class="trophy-stat-num" id="trophyStreak">-</div>
+      <div class="trophy-stat-label">連続日数</div>
+    </div>
+    <div class="trophy-stat-card">
+      <div class="trophy-stat-num" id="trophyUnlocked">-</div>
+      <div class="trophy-stat-label">トロフィー</div>
+    </div>
+  </div>
+
+  <div class="trophy-tabs" id="trophyTabs">
+    <div class="trophy-tab active" data-cat="all" onclick="filterTrophies('all')">すべて</div>
+    <div class="trophy-tab" data-cat="total" onclick="filterTrophies('total')">本数系</div>
+    <div class="trophy-tab" data-cat="streak" onclick="filterTrophies('streak')">連続系</div>
+    <div class="trophy-tab" data-cat="rate" onclick="filterTrophies('rate')">成功率系</div>
+    <div class="trophy-tab" data-cat="special" onclick="filterTrophies('special')">特別</div>
+  </div>
+
+  <div class="trophy-count-badge" id="trophyCountBadge"></div>
+  <div class="trophy-list" id="trophyList">
+    <div class="trophy-loading">読み込み中...</div>
+  </div>
+</div>
+
+<!-- ===== Bottom Navigation ===== -->
+<div class="bottom-nav" id="bottomNav" style="display:none;">
+  <button class="nav-btn active" id="navRecord" onclick="switchTab('record')">
+    <div class="nav-icon">🏀</div>
+    <div class="nav-label">記録</div>
+  </button>
+  <button class="nav-btn" id="navTrophy" onclick="switchTab('trophy')">
+    <div class="nav-icon">🏆</div>
+    <div class="nav-label">トロフィー</div>
+  </button>
+</div>
+
 <script>
   // ===== LIFF =====
   const LIFF_ID = '2009325083-qDkPrSGU';
@@ -709,6 +904,7 @@
         showScreen('screen1');
         document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
         document.querySelectorAll('.steps')[0].style.display = 'flex';
+        document.getElementById('bottomNav').style.display = 'flex';
       } else {
         showScreen('screenRegister');
         document.getElementById('stepLabel').textContent = '';
@@ -883,6 +1079,172 @@
     document.getElementById('btnNext2').disabled = true;
     document.getElementById('btnNext3').disabled = true;
     goToScreen(1);
+  }
+
+  // ===== Trophy Definitions (mirror of GAS) =====
+  const TROPHY_DEFS = {
+    FIRST_SHOT: { name:'初シュート記録', emoji:'🎯', cat:'special' },
+    TOTAL_100: { name:'100本達成', emoji:'💯', cat:'total' },
+    TOTAL_1000: { name:'1,000本達成', emoji:'🔥', cat:'total' },
+    TOTAL_10000: { name:'10,000本達成', emoji:'⭐', cat:'total' },
+    TOTAL_100000: { name:'100,000本達成', emoji:'🌟', cat:'total' },
+    TOTAL_1000000: { name:'1,000,000本', emoji:'👑', cat:'total' },
+    TOTAL_10000000: { name:'10,000,000本', emoji:'🏆', cat:'total' },
+    TOTAL_100000000: { name:'GOAT', emoji:'👑', cat:'total' },
+    ALL_AREA_100: { name:'全エリア各100本', emoji:'🗺️', cat:'total' },
+    ALL_AREA_500: { name:'全エリア各500本', emoji:'📍', cat:'total' },
+    ALL_AREA_1000: { name:'全エリア各1,000本', emoji:'🏟️', cat:'total' },
+    ALL_AREA_5000: { name:'全エリア各5,000本', emoji:'🎖️', cat:'total' },
+    ALL_AREA_10000: { name:'全エリア各10,000本', emoji:'🏅', cat:'total' },
+    ALL_AREA_1000000: { name:'COURT MASTER', emoji:'🌐', cat:'total' },
+    AREA_HUNTER: { name:'エリアハンター', emoji:'🎯', cat:'special' },
+    EARLY_BIRD: { name:'アーリーバード', emoji:'🌅', cat:'special' },
+    NIGHT_OWL: { name:'ナイトオウル', emoji:'🦉', cat:'special' },
+    SPEED_RUN: { name:'スピードラン', emoji:'⚡', cat:'special' },
+    ALL_LV_DAY: { name:'オールレベル', emoji:'🌈', cat:'special' },
+    FULL_COURT: { name:'フルコート', emoji:'🏀', cat:'special' },
+    COMEBACK: { name:'カムバック', emoji:'💪', cat:'special' }
+  };
+  // 継続系
+  ['3M','6M','9M','12M','15M','18M','21M','24M','27M','30M','33M','36M'].forEach(m => {
+    TROPHY_DEFS['CONTINUE_'+m] = { name:'継続'+m.replace('M','ヶ月'), emoji:'📅', cat:'streak' };
+  });
+  // 連続系
+  [7,14,21,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,260,270,280,290,300,310,320,330,340,350,365].forEach(d => {
+    TROPHY_DEFS['STREAK_'+d] = { name: d+'日連続', emoji: d===365?'🐍':(d>=100?'💯':'🔥'), cat:'streak' };
+  });
+  // 週間系
+  [2000,3000,4000,5000,6000,7000,8000,9000,10000].forEach(n => {
+    TROPHY_DEFS['WEEK_'+n] = { name:'週間'+n.toLocaleString()+'本', emoji:'📊', cat:'total' };
+  });
+  // 成功率系（セッション/週間/月間 × LV1-6 × 50-100%）
+  ['SESSION','WEEK','MONTH'].forEach(p => {
+    const pName = p==='SESSION'?'1S':p==='WEEK'?'週':' 月';
+    for(let lv=1;lv<=6;lv++){
+      [50,60,70,80,90,100].forEach(r => {
+        TROPHY_DEFS[p+'_LV'+lv+'_'+r] = {
+          name: pName+' LV'+lv+' '+r+'%',
+          emoji: r===100?'🏆':(r>=80?'⭐':'📈'),
+          cat: 'rate'
+        };
+      });
+    }
+  });
+
+  // ===== Tab Switching =====
+  let currentTab = 'record';
+  let trophyDataCache = null;
+  let currentTrophyFilter = 'all';
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('navRecord').classList.toggle('active', tab === 'record');
+    document.getElementById('navTrophy').classList.toggle('active', tab === 'trophy');
+
+    // Record screens
+    const recordElements = ['screen1','screen2','screen3','screen4','screen5','screenLoading','screenRegister'];
+    const stepsEl = document.querySelector('.steps');
+    const stepLabel = document.getElementById('stepLabel');
+
+    if (tab === 'record') {
+      document.getElementById('trophyPage').classList.remove('active');
+      stepsEl.style.display = 'flex';
+      stepLabel.style.display = 'block';
+      // 現在のscreen表示を復元
+      if (!document.querySelector('.screen.active')) {
+        goToScreen(1);
+      }
+    } else {
+      // Hide all record screens
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      stepsEl.style.display = 'none';
+      stepLabel.style.display = 'none';
+      document.getElementById('trophyPage').classList.add('active');
+      loadTrophies();
+    }
+  }
+
+  function loadTrophies() {
+    if (!liffUserId) return;
+    document.getElementById('trophyList').innerHTML = '<div class="trophy-loading">読み込み中...</div>';
+
+    const callbackName = 'trophyCb_' + Date.now();
+    window[callbackName] = function(data) {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      if (data.status === 'ok') {
+        trophyDataCache = data;
+        renderTrophyStats(data);
+        renderTrophies(data.trophies, currentTrophyFilter);
+      }
+    };
+    const script = document.createElement('script');
+    script.src = GAS_URL + '?action=getTrophies&userId=' + encodeURIComponent(liffUserId) + '&callback=' + callbackName;
+    script.onerror = function() {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      document.getElementById('trophyList').innerHTML = '<div class="trophy-loading">読み込みに失敗しました</div>';
+    };
+    document.body.appendChild(script);
+  }
+
+  function renderTrophyStats(data) {
+    document.getElementById('trophyTotalMakes').textContent = (data.totalMakes || 0).toLocaleString();
+    document.getElementById('trophyStreak').textContent = data.streak || 0;
+    document.getElementById('trophyUnlocked').textContent = (data.trophies || []).length;
+  }
+
+  function filterTrophies(cat) {
+    currentTrophyFilter = cat;
+    document.querySelectorAll('.trophy-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.cat === cat);
+    });
+    if (trophyDataCache) {
+      renderTrophies(trophyDataCache.trophies, cat);
+    }
+  }
+
+  function renderTrophies(unlockedList, category) {
+    const container = document.getElementById('trophyList');
+    const unlocked = new Set(unlockedList || []);
+
+    // Filter trophy defs by category
+    let entries = Object.entries(TROPHY_DEFS);
+    if (category !== 'all') {
+      entries = entries.filter(([k, v]) => v.cat === category);
+    }
+
+    // Sort: unlocked first, then locked
+    entries.sort((a, b) => {
+      const aU = unlocked.has(a[0]) ? 0 : 1;
+      const bU = unlocked.has(b[0]) ? 0 : 1;
+      return aU - bU;
+    });
+
+    // Count
+    const unlockedInCat = entries.filter(([k]) => unlocked.has(k)).length;
+    document.getElementById('trophyCountBadge').innerHTML =
+      '<strong>' + unlockedInCat + '</strong> / ' + entries.length + ' 解放済み';
+
+    // Limit display (show unlocked + first 30 locked to avoid huge DOM)
+    const unlockedEntries = entries.filter(([k]) => unlocked.has(k));
+    const lockedEntries = entries.filter(([k]) => !unlocked.has(k)).slice(0, 30);
+    const displayEntries = [...unlockedEntries, ...lockedEntries];
+
+    let html = '';
+    displayEntries.forEach(([key, def]) => {
+      const isUnlocked = unlocked.has(key);
+      html += '<div class="trophy-item ' + (isUnlocked ? 'unlocked' : 'locked') + '">';
+      html += '<div class="trophy-emoji">' + (isUnlocked ? def.emoji : '❓') + '</div>';
+      html += '<div class="trophy-name">' + (isUnlocked ? def.name : '???') + '</div>';
+      html += '</div>';
+    });
+
+    if (lockedEntries.length < entries.filter(([k]) => !unlocked.has(k)).length) {
+      html += '<div style="grid-column:1/-1; text-align:center; color:var(--text-dim); font-size:12px; padding:8px;">他にも未解放トロフィーがあります</div>';
+    }
+
+    container.innerHTML = html || '<div class="trophy-loading">トロフィーはまだありません</div>';
   }
 </script>
 
