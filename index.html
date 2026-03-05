@@ -1279,6 +1279,17 @@
   let selectedShot = null;
 
   // エリア×LV有効マトリクス
+  // NBA選手データ（LIFF表示用）
+  const NBA_HEROES_LITE = {
+    LV1: { name: 'ヤニス', rate: 72, emoji: '🦌' },
+    LV2: { name: 'ヒーロー', rate: 54, emoji: '🔥' },
+    LV3: { name: 'デュラント', rate: 52, emoji: '🐍' },
+    LV4: { name: 'カリー', rate: 42, emoji: '👨‍🍳' },
+    LV5: { name: 'カリー', rate: 40, emoji: '👨‍🍳' },
+    LV6: { name: 'カリー', rate: 93, emoji: '👨‍🍳' }
+  };
+
+  // エリア×LV有効マトリクス
   const VALID_AREA_LV = {
     A1:['LV5'], A2:['LV5'], A3:['LV5'], A4:['LV5'], A5:['LV5'],
     B1:['LV4','LV5'], B2:['LV3','LV4','LV5'], B3:['LV3','LV4','LV5'], B4:['LV3','LV4','LV5'], B5:['LV4','LV5'],
@@ -1634,10 +1645,15 @@
         const d = (w.lvBreakdown && w.lvBreakdown[lv]) ? w.lvBreakdown[lv] : null;
         if (d && d.attempts > 0) {
           const rate = Math.round((d.makes / d.attempts) * 100);
+          const nba = NBA_HEROES_LITE[lv];
+          const gap = nba ? nba.rate - rate : 0;
           lvHtml += '<div class="lv-chip">';
           lvHtml += '<div class="lv-chip-name">' + lv + '</div>';
           lvHtml += '<div class="lv-chip-num">' + d.attempts + '</div>';
-          lvHtml += '<div class="lv-chip-rate">' + rate + '% (' + d.makes + '/' + d.attempts + ')</div>';
+          lvHtml += '<div class="lv-chip-rate">' + rate + '%（' + d.makes + '/' + d.attempts + '）</div>';
+          if (nba) {
+            lvHtml += '<div class="lv-chip-rate" style="color:var(--gold);margin-top:2px;">' + nba.emoji + nba.name + 'まで' + gap + '%</div>';
+          }
           lvHtml += '</div>';
         }
       });
@@ -1795,6 +1811,13 @@
       lvHtml += '最高：' + best.rate + '%（' + best.area + '）<span> / 中央値：' + median + '%</span><br>';
       lvHtml += d.attempts + '本中 ' + d.makes + '本成功（' + rate + '%）<br>';
       lvHtml += 'ベスト：' + best.area + '(' + best.rate + '%) <span>/ 伸びしろ：' + growth.area + '(' + growth.rate + '%)</span>';
+      // NBA比較
+      if (data.nbaHeroes && data.nbaHeroes[lv]) {
+        const nba = data.nbaHeroes[lv];
+        const topPlayer = nba.players[0];
+        const gap = topPlayer.rate - rate;
+        lvHtml += '<br><span style="color:var(--gold);font-size:12px;">' + topPlayer.emoji + ' NBAトップ：' + topPlayer.name + ' ' + topPlayer.rate + '%（あと' + gap + '%）</span>';
+      }
       lvHtml += '</div></div>';
     });
 
