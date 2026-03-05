@@ -595,6 +595,104 @@
     color: var(--text-dim);
     font-size: 14px;
   }
+
+  /* ===== Weekly Progress ===== */
+  .weekly-section {
+    max-width: 360px;
+    margin: 0 auto 16px;
+  }
+  .weekly-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .weekly-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: var(--gold);
+    letter-spacing: 2px;
+  }
+  .weekly-date {
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .progress-bar-wrap {
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px;
+    height: 20px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 10px;
+    background: linear-gradient(90deg, var(--green-accent), var(--gold));
+    transition: width 0.6s ease;
+    min-width: 2px;
+  }
+  .progress-bar-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 12px;
+    color: var(--white-pure);
+    letter-spacing: 1px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+  .weekly-numbers {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .weekly-numbers strong { color: var(--gold); }
+  .weekly-remaining {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+  .weekly-remaining strong { color: var(--gold); font-family: 'Bebas Neue', sans-serif; font-size: 16px; }
+
+  .lv-breakdown {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 360px;
+    margin: 10px auto 0;
+  }
+  .lv-chip {
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .lv-chip-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    color: var(--gold);
+  }
+  .lv-chip-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: var(--white-pure);
+    margin-top: 2px;
+  }
+  .lv-chip-rate {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
 </style>
 </head>
 <body>
@@ -834,6 +932,25 @@
 
 <!-- ===== Trophy Page ===== -->
 <div class="trophy-page" id="trophyPage">
+  <!-- Weekly Progress -->
+  <div class="weekly-section" id="weeklySection">
+    <div class="weekly-header">
+      <div class="weekly-title">WEEKLY PROGRESS</div>
+      <div class="weekly-date" id="weeklyDate"></div>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+      <div class="progress-bar-text" id="progressText">0%</div>
+    </div>
+    <div class="weekly-numbers">
+      <span><strong id="weeklyAttempts">0</strong> 本</span>
+      <span>目標 <strong>2,000</strong> 本</span>
+    </div>
+    <div class="weekly-remaining" id="weeklyRemaining"></div>
+    <div class="lv-breakdown" id="lvBreakdown"></div>
+  </div>
+
+  <!-- Stats Cards -->
   <div class="trophy-stats" id="trophyStats">
     <div class="trophy-stat-card">
       <div class="trophy-stat-num" id="trophyTotalMakes">-</div>
@@ -1225,6 +1342,45 @@
     document.getElementById('trophyTotalMakes').textContent = (data.totalMakes || 0).toLocaleString();
     document.getElementById('trophyStreak').textContent = data.streak || 0;
     document.getElementById('trophyUnlocked').textContent = (data.trophies || []).length;
+
+    // Weekly Progress
+    if (data.weekly) {
+      const w = data.weekly;
+      const pct = Math.min(100, Math.round((w.attempts / w.goal) * 100));
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('progressText').textContent = pct + '%';
+      document.getElementById('weeklyAttempts').textContent = w.attempts.toLocaleString();
+
+      if (w.start && w.end) {
+        const s = w.start.split('-');
+        const e = w.end.split('-');
+        document.getElementById('weeklyDate').textContent = s[1] + '/' + s[2] + ' - ' + e[1] + '/' + e[2];
+      }
+
+      const remaining = Math.max(0, w.goal - w.attempts);
+      if (remaining > 0) {
+        document.getElementById('weeklyRemaining').innerHTML = 'あと <strong>' + remaining.toLocaleString() + '</strong> 本';
+      } else {
+        document.getElementById('weeklyRemaining').innerHTML = '🎉 <strong>目標達成！</strong>';
+      }
+
+      // LV Breakdown
+      const lvNames = { LV1:'リム', LV2:'フローター', LV3:'ミドル', LV4:'3P', LV5:'Deep3P', LV6:'FT' };
+      const lvOrder = ['LV1','LV2','LV3','LV4','LV5','LV6'];
+      let lvHtml = '';
+      lvOrder.forEach(lv => {
+        const d = (w.lvBreakdown && w.lvBreakdown[lv]) ? w.lvBreakdown[lv] : null;
+        if (d && d.attempts > 0) {
+          const rate = Math.round((d.makes / d.attempts) * 100);
+          lvHtml += '<div class="lv-chip">';
+          lvHtml += '<div class="lv-chip-name">' + lv + '</div>';
+          lvHtml += '<div class="lv-chip-num">' + d.attempts + '</div>';
+          lvHtml += '<div class="lv-chip-rate">' + rate + '% (' + d.makes + '/' + d.attempts + ')</div>';
+          lvHtml += '</div>';
+        }
+      });
+      document.getElementById('lvBreakdown').innerHTML = lvHtml || '<div style="grid-column:1/-1; text-align:center; color:var(--text-dim); font-size:12px;">今週の記録はまだありません</div>';
+    }
   }
 
   function filterTrophies(cat) {
