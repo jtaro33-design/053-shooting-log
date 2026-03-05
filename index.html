@@ -1645,15 +1645,10 @@
         const d = (w.lvBreakdown && w.lvBreakdown[lv]) ? w.lvBreakdown[lv] : null;
         if (d && d.attempts > 0) {
           const rate = Math.round((d.makes / d.attempts) * 100);
-          const nba = NBA_HEROES_LITE[lv];
-          const gap = nba ? nba.rate - rate : 0;
           lvHtml += '<div class="lv-chip">';
           lvHtml += '<div class="lv-chip-name">' + lv + '</div>';
           lvHtml += '<div class="lv-chip-num">' + d.attempts + '</div>';
           lvHtml += '<div class="lv-chip-rate">' + rate + '%（' + d.makes + '/' + d.attempts + '）</div>';
-          if (nba) {
-            lvHtml += '<div class="lv-chip-rate" style="color:var(--gold);margin-top:2px;">' + nba.emoji + nba.name + 'まで' + gap + '%</div>';
-          }
           lvHtml += '</div>';
         }
       });
