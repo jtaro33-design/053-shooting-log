@@ -213,6 +213,11 @@
     box-shadow: 0 0 20px rgba(200,168,112,0.15);
   }
   .shot-btn.selected::before { opacity: 1; }
+  .shot-btn.disabled {
+    opacity: 0.2;
+    pointer-events: none;
+    filter: grayscale(0.8);
+  }
   .shot-lv {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 32px;
@@ -937,6 +942,14 @@
   let selectedArea = null;
   let selectedShot = null;
 
+  // エリア×LV有効マトリクス
+  const VALID_AREA_LV = {
+    A1:['LV5'], A2:['LV5'], A3:['LV5'], A4:['LV5'], A5:['LV5'],
+    B1:['LV4','LV5'], B2:['LV3','LV4','LV5'], B3:['LV3','LV4','LV5'], B4:['LV3','LV4','LV5'], B5:['LV4','LV5'],
+    C1:['LV3','LV4'], C2:['LV2','LV3'], C3:['LV2','LV3','LV6'], C4:['LV2','LV3'], C5:['LV3','LV4'],
+    D1:['LV3','LV4'], D2:['LV1','LV2','LV3'], D3:['LV1','LV2','LV3'], D4:['LV1','LV2','LV3'], D5:['LV3','LV4']
+  };
+
   const rows = ['A','B','C','D'];
   const cols = [1,2,3,4,5];
   const grid = document.getElementById('courtGrid');
@@ -1003,6 +1016,26 @@
       4: 'STEP 4 ─ メモ（任意）'
     };
     document.getElementById('stepLabel').textContent = labels[num] || '';
+
+    // Screen2: エリアに応じてLVをフィルタ
+    if (num === 2 && selectedArea) {
+      const validLVs = VALID_AREA_LV[selectedArea] || [];
+      document.querySelectorAll('.shot-btn').forEach(btn => {
+        const lv = btn.dataset.type;
+        if (validLVs.indexOf(lv) >= 0) {
+          btn.classList.remove('disabled');
+        } else {
+          btn.classList.add('disabled');
+          btn.classList.remove('selected');
+        }
+      });
+      // 選択中のLVが無効になったらリセット
+      if (selectedShot && validLVs.indexOf(selectedShot) < 0) {
+        selectedShot = null;
+        document.getElementById('btnNext2').disabled = true;
+      }
+    }
+
     if (num === 3) {
       document.getElementById('summaryArea').textContent = selectedArea;
       document.getElementById('summaryShot').textContent = selectedShot;
