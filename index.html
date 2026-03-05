@@ -693,6 +693,147 @@
     color: var(--text-dim);
     margin-top: 1px;
   }
+
+  /* ===== Report Page ===== */
+  .report-page { display: none; padding: 0 16px 24px; }
+  .report-page.active { display: block; animation: fadeIn 0.3s ease; }
+
+  .report-section {
+    max-width: 360px;
+    margin: 0 auto 16px;
+  }
+  .report-section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    color: var(--gold);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(200,168,112,0.15);
+  }
+  .report-header {
+    max-width: 360px;
+    margin: 16px auto 12px;
+    text-align: center;
+  }
+  .report-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+  .report-subtitle {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .report-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .report-summary-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(200,168,112,0.12);
+    border-radius: 10px;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .report-card-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    color: var(--white-pure);
+  }
+  .report-card-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .report-card-diff {
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .report-card-diff.up { color: #5CB85C; }
+  .report-card-diff.down { color: #D9534F; }
+  .report-card-diff.flat { color: var(--text-dim); }
+
+  .report-lv-item {
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .report-lv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .report-lv-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: var(--gold);
+  }
+  .report-lv-diff {
+    font-size: 12px;
+  }
+  .report-lv-stats {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.8;
+  }
+  .report-lv-stats span { color: var(--text-dim); }
+
+  .report-area-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 4px;
+  }
+  .report-area-cell {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 9px;
+    color: var(--white-pure);
+    position: relative;
+  }
+  .report-area-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 12px;
+    opacity: 0.8;
+  }
+  .report-area-rate {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+  }
+  .report-area-cell.no-data {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-dim);
+  }
+
+  .report-daily-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13px;
+    color: var(--text);
+  }
+  .report-daily-date { color: var(--text-dim); font-size: 12px; }
+  .report-daily-num { font-family: 'Bebas Neue', sans-serif; font-size: 16px; color: var(--gold); }
+
+  .report-loading {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
 </style>
 </head>
 <body>
@@ -980,11 +1121,45 @@
   </div>
 </div>
 
+<!-- ===== Report Page ===== -->
+<div class="report-page" id="reportPage">
+  <div class="report-header">
+    <div class="report-title">WEEKLY DETAIL REPORT</div>
+    <div class="report-subtitle" id="reportDateRange"></div>
+  </div>
+
+  <div class="report-section">
+    <div class="report-section-title">SUMMARY</div>
+    <div class="report-summary-grid" id="reportSummary"></div>
+  </div>
+
+  <div class="report-section">
+    <div class="report-section-title">LV BREAKDOWN</div>
+    <div id="reportLvList"></div>
+  </div>
+
+  <div class="report-section">
+    <div class="report-section-title">AREA HEATMAP</div>
+    <div class="report-area-grid" id="reportAreaGrid"></div>
+  </div>
+
+  <div class="report-section">
+    <div class="report-section-title">DAILY LOG</div>
+    <div id="reportDailyLog"></div>
+  </div>
+
+  <div class="report-loading" id="reportLoading">読み込み中...</div>
+</div>
+
 <!-- ===== Bottom Navigation ===== -->
 <div class="bottom-nav" id="bottomNav" style="display:none;">
   <button class="nav-btn active" id="navRecord" onclick="switchTab('record')">
     <div class="nav-icon">🏀</div>
     <div class="nav-label">記録</div>
+  </button>
+  <button class="nav-btn" id="navReport" onclick="switchTab('report')">
+    <div class="nav-icon">📊</div>
+    <div class="nav-label">レポート</div>
   </button>
   <button class="nav-btn" id="navTrophy" onclick="switchTab('trophy')">
     <div class="nav-icon">🏆</div>
@@ -1290,27 +1465,33 @@
     currentTab = tab;
     document.getElementById('navRecord').classList.toggle('active', tab === 'record');
     document.getElementById('navTrophy').classList.toggle('active', tab === 'trophy');
+    document.getElementById('navReport').classList.toggle('active', tab === 'report');
 
-    // Record screens
-    const recordElements = ['screen1','screen2','screen3','screen4','screen5','screenLoading','screenRegister'];
     const stepsEl = document.querySelector('.steps');
     const stepLabel = document.getElementById('stepLabel');
 
     if (tab === 'record') {
       document.getElementById('trophyPage').classList.remove('active');
+      document.getElementById('reportPage').classList.remove('active');
       stepsEl.style.display = 'flex';
       stepLabel.style.display = 'block';
-      // 現在のscreen表示を復元
       if (!document.querySelector('.screen.active')) {
         goToScreen(1);
       }
-    } else {
-      // Hide all record screens
+    } else if (tab === 'trophy') {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       stepsEl.style.display = 'none';
       stepLabel.style.display = 'none';
+      document.getElementById('reportPage').classList.remove('active');
       document.getElementById('trophyPage').classList.add('active');
       loadTrophies();
+    } else if (tab === 'report') {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      stepsEl.style.display = 'none';
+      stepLabel.style.display = 'none';
+      document.getElementById('trophyPage').classList.remove('active');
+      document.getElementById('reportPage').classList.add('active');
+      loadReport();
     }
   }
 
@@ -1434,6 +1615,150 @@
     }
 
     container.innerHTML = html || '<div class="trophy-loading">トロフィーはまだありません</div>';
+  }
+
+  // ===== Report =====
+  function loadReport() {
+    if (!liffUserId) return;
+    document.getElementById('reportLoading').style.display = 'block';
+    document.getElementById('reportSummary').innerHTML = '';
+    document.getElementById('reportLvList').innerHTML = '';
+    document.getElementById('reportAreaGrid').innerHTML = '';
+    document.getElementById('reportDailyLog').innerHTML = '';
+
+    const callbackName = 'reportCb_' + Date.now();
+    window[callbackName] = function(data) {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      document.getElementById('reportLoading').style.display = 'none';
+      if (data.status === 'ok') {
+        renderReport(data);
+      }
+    };
+    const script = document.createElement('script');
+    script.src = GAS_URL + '?action=getReport&userId=' + encodeURIComponent(liffUserId) + '&callback=' + callbackName;
+    script.onerror = function() {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      document.getElementById('reportLoading').textContent = '読み込みに失敗しました';
+    };
+    document.body.appendChild(script);
+  }
+
+  function renderReport(data) {
+    // Date range
+    if (data.week) {
+      const s = data.week.start.split('-');
+      const e = data.week.end.split('-');
+      document.getElementById('reportDateRange').textContent = s[1] + '/' + s[2] + ' - ' + e[1] + '/' + e[2];
+    }
+
+    // Summary cards
+    const weekRate = data.weekAttempts > 0 ? Math.round((data.weekMakes / data.weekAttempts) * 100) : 0;
+    const prevRate = data.prevAttempts > 0 ? Math.round((data.prevMakes / data.prevAttempts) * 100) : 0;
+    const diffAttempts = data.weekAttempts - data.prevAttempts;
+    const diffRate = weekRate - prevRate;
+    const progress = Math.min(100, Math.round((data.weekAttempts / 2000) * 100));
+
+    function diffHtml(val, suffix) {
+      if (data.prevAttempts === 0) return '<div class="report-card-diff flat">-</div>';
+      const cls = val > 0 ? 'up' : (val < 0 ? 'down' : 'flat');
+      const sign = val > 0 ? '+' : '';
+      return '<div class="report-card-diff ' + cls + '">' + sign + val + suffix + '</div>';
+    }
+
+    let summaryHtml = '';
+    summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + data.weekAttempts.toLocaleString() + '</div><div class="report-card-label">シュート数</div>' + diffHtml(diffAttempts, '本') + '</div>';
+    summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + weekRate + '%</div><div class="report-card-label">成功率</div>' + diffHtml(diffRate, '%') + '</div>';
+    summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + data.practiceDays + '日</div><div class="report-card-label">練習日数</div>' + diffHtml(data.practiceDays - data.prevDays, '日') + '</div>';
+    summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + progress + '%</div><div class="report-card-label">2,000本達成率</div><div class="report-card-diff flat">' + data.weekAttempts + ' / 2,000</div></div>';
+    document.getElementById('reportSummary').innerHTML = summaryHtml;
+
+    // LV Breakdown
+    const lvNames = { LV1:'リム', LV2:'フローター', LV3:'ミドル', LV4:'3P', LV5:'Deep3P', LV6:'FT' };
+    const lvOrder = ['LV1','LV2','LV3','LV4','LV5','LV6'];
+    let lvHtml = '';
+
+    lvOrder.forEach(lv => {
+      const d = data.lvData[lv];
+      if (!d || d.attempts === 0) return;
+
+      const rate = Math.round((d.makes / d.attempts) * 100);
+      const prevLv = data.prevLvData[lv];
+      let diffStr = '';
+      if (prevLv && prevLv.attempts > 0) {
+        const pRate = Math.round((prevLv.makes / prevLv.attempts) * 100);
+        const diff = rate - pRate;
+        const cls = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'flat');
+        const sign = diff > 0 ? '+' : '';
+        diffStr = '<span class="report-lv-diff report-card-diff ' + cls + '">' + sign + diff + '%</span>';
+      }
+
+      // Best / Growth areas
+      const areas = d.areas;
+      const areaKeys = Object.keys(areas);
+      const areaRates = areaKeys.map(a => {
+        const ad = areas[a];
+        return { area: a, rate: ad.attempts > 0 ? Math.round((ad.makes / ad.attempts) * 100) : 0 };
+      }).sort((a, b) => b.rate - a.rate);
+
+      const best = areaRates[0];
+      const growth = areaRates[areaRates.length - 1];
+      const midIdx = Math.floor(areaRates.length / 2);
+      const median = areaRates[midIdx].rate;
+
+      lvHtml += '<div class="report-lv-item">';
+      lvHtml += '<div class="report-lv-header"><div class="report-lv-name">' + lv + ' ' + (lvNames[lv]||'') + '</div>' + diffStr + '</div>';
+      lvHtml += '<div class="report-lv-stats">';
+      lvHtml += '最高：' + best.rate + '%（' + best.area + '）<span> / 中央値：' + median + '%</span><br>';
+      lvHtml += d.attempts + '本中 ' + d.makes + '本成功（' + rate + '%）<br>';
+      lvHtml += 'ベスト：' + best.area + '(' + best.rate + '%) <span>/ 伸びしろ：' + growth.area + '(' + growth.rate + '%)</span>';
+      lvHtml += '</div></div>';
+    });
+
+    document.getElementById('reportLvList').innerHTML = lvHtml || '<div class="report-loading" style="padding:20px 0;">今週のLV別データはありません</div>';
+
+    // Area Heatmap
+    const rows = ['A','B','C','D'];
+    const cols = [1,2,3,4,5];
+    let areaHtml = '';
+
+    rows.forEach(row => {
+      cols.forEach(col => {
+        const area = row + col;
+        const ad = data.areaData[area];
+        if (ad && ad.attempts > 0) {
+          const rate = Math.round((ad.makes / ad.attempts) * 100);
+          const hue = Math.min(rate * 1.2, 120);
+          const bg = 'hsla(' + hue + ', 60%, 35%, 0.7)';
+          areaHtml += '<div class="report-area-cell" style="background:' + bg + '">';
+          areaHtml += '<div class="report-area-label">' + area + '</div>';
+          areaHtml += '<div class="report-area-rate">' + rate + '%</div>';
+          areaHtml += '</div>';
+        } else {
+          areaHtml += '<div class="report-area-cell no-data">';
+          areaHtml += '<div class="report-area-label">' + area + '</div>';
+          areaHtml += '<div class="report-area-rate">-</div>';
+          areaHtml += '</div>';
+        }
+      });
+    });
+    document.getElementById('reportAreaGrid').innerHTML = areaHtml;
+
+    // Daily Log
+    const dailyEntries = Object.entries(data.dailyData || {}).sort((a, b) => a[0].localeCompare(b[0]));
+    let dailyHtml = '';
+    dailyEntries.forEach(([date, d]) => {
+      const rate = d.attempts > 0 ? Math.round((d.makes / d.attempts) * 100) : 0;
+      const dateParts = date.split('-');
+      const displayDate = dateParts[1] + '/' + dateParts[2];
+      dailyHtml += '<div class="report-daily-row">';
+      dailyHtml += '<div class="report-daily-date">' + displayDate + '</div>';
+      dailyHtml += '<div><span class="report-daily-num">' + d.attempts + '</span> 本</div>';
+      dailyHtml += '<div>' + d.makes + '/' + d.attempts + '（' + rate + '%）</div>';
+      dailyHtml += '</div>';
+    });
+    document.getElementById('reportDailyLog').innerHTML = dailyHtml || '<div class="report-loading" style="padding:20px 0;">今週の記録はまだありません</div>';
   }
 </script>
 
