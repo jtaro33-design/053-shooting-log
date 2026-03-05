@@ -1645,10 +1645,24 @@
         const d = (w.lvBreakdown && w.lvBreakdown[lv]) ? w.lvBreakdown[lv] : null;
         if (d && d.attempts > 0) {
           const rate = Math.round((d.makes / d.attempts) * 100);
+          const prevD = (w.prevLvBreakdown && w.prevLvBreakdown[lv]) ? w.prevLvBreakdown[lv] : null;
+          let growthHtml = '';
+          if (prevD && prevD.attempts > 0) {
+            const prevRate = Math.round((prevD.makes / prevD.attempts) * 100);
+            const diff = rate - prevRate;
+            if (diff > 0) {
+              growthHtml = '<div class="lv-chip-rate" style="color:#5CB85C;font-weight:700;">📈 +' + diff + '%</div>';
+            } else if (diff < 0) {
+              growthHtml = '<div class="lv-chip-rate" style="color:var(--text-dim);">' + diff + '%</div>';
+            } else {
+              growthHtml = '<div class="lv-chip-rate" style="color:var(--text-dim);">±0%</div>';
+            }
+          }
           lvHtml += '<div class="lv-chip">';
           lvHtml += '<div class="lv-chip-name">' + lv + '</div>';
           lvHtml += '<div class="lv-chip-num">' + d.attempts + '</div>';
           lvHtml += '<div class="lv-chip-rate">' + rate + '%（' + d.makes + '/' + d.attempts + '）</div>';
+          lvHtml += growthHtml;
           lvHtml += '</div>';
         }
       });
@@ -1762,7 +1776,16 @@
 
     let summaryHtml = '';
     summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + data.weekAttempts.toLocaleString() + '</div><div class="report-card-label">シュート数</div>' + diffHtml(diffAttempts, '本') + '</div>';
-    summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + weekRate + '%</div><div class="report-card-label">成功率</div>' + diffHtml(diffRate, '%') + '</div>';
+
+    // 成長率カード（成功率より成長率を大きく表示）
+    if (data.prevAttempts > 0 && diffRate !== 0) {
+      const growthSign = diffRate > 0 ? '+' : '';
+      const growthColor = diffRate > 0 ? '#5CB85C' : '#D9534F';
+      summaryHtml += '<div class="report-summary-card"><div class="report-card-num" style="color:' + growthColor + '">' + growthSign + diffRate + '%</div><div class="report-card-label">成長率</div><div class="report-card-diff flat">成功率 ' + weekRate + '%</div></div>';
+    } else {
+      summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + weekRate + '%</div><div class="report-card-label">成功率</div>' + diffHtml(diffRate, '%') + '</div>';
+    }
+
     summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + data.practiceDays + '日</div><div class="report-card-label">練習日数</div>' + diffHtml(data.practiceDays - data.prevDays, '日') + '</div>';
     summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + progress + '%</div><div class="report-card-label">2,000本達成率</div><div class="report-card-diff flat">' + data.weekAttempts + ' / 2,000</div></div>';
     document.getElementById('reportSummary').innerHTML = summaryHtml;
@@ -1779,12 +1802,18 @@
       const rate = Math.round((d.makes / d.attempts) * 100);
       const prevLv = data.prevLvData[lv];
       let diffStr = '';
+      let growthLine = '';
       if (prevLv && prevLv.attempts > 0) {
         const pRate = Math.round((prevLv.makes / prevLv.attempts) * 100);
         const diff = rate - pRate;
         const cls = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'flat');
         const sign = diff > 0 ? '+' : '';
-        diffStr = '<span class="report-lv-diff report-card-diff ' + cls + '">' + sign + diff + '%</span>';
+        diffStr = '<span class="report-lv-diff report-card-diff ' + cls + '" style="font-size:16px;">' + sign + diff + '%</span>';
+        if (diff > 0) {
+          growthLine = '<br><span style="color:#5CB85C;font-size:13px;font-weight:700;">📈 先週から' + diff + '%成長！</span>';
+        } else if (diff < 0) {
+          growthLine = '<br><span style="color:var(--text-dim);font-size:12px;">少し波があるけど大丈夫。続けることが大事。</span>';
+        }
       }
 
       // Best / Growth areas
@@ -1806,6 +1835,7 @@
       lvHtml += '最高：' + best.rate + '%（' + best.area + '）<span> / 中央値：' + median + '%</span><br>';
       lvHtml += d.attempts + '本中 ' + d.makes + '本成功（' + rate + '%）<br>';
       lvHtml += 'ベスト：' + best.area + '(' + best.rate + '%) <span>/ 伸びしろ：' + growth.area + '(' + growth.rate + '%)</span>';
+      lvHtml += growthLine;
       // NBA比較
       if (data.nbaHeroes && data.nbaHeroes[lv]) {
         const nba = data.nbaHeroes[lv];
