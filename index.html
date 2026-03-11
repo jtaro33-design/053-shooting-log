@@ -1460,6 +1460,12 @@
             <rect x="150" y="312" width="200" height="158" stroke="white" stroke-width="2.5" fill="none" opacity="0.8"/>
             <path d="M 200 312 A 50 50 0 0 1 300 312" stroke="white" stroke-width="2" fill="none" opacity="0.7"/>
             <path d="M 200 312 A 50 50 0 0 0 300 312" stroke="white" stroke-width="2" fill="none" opacity="0.35" stroke-dasharray="8 6"/>
+            <line x1="140" y1="345" x2="150" y2="345" stroke="white" stroke-width="2" opacity="0.5"/>
+            <line x1="140" y1="380" x2="150" y2="380" stroke="white" stroke-width="2" opacity="0.5"/>
+            <line x1="140" y1="415" x2="150" y2="415" stroke="white" stroke-width="2" opacity="0.5"/>
+            <line x1="350" y1="345" x2="360" y2="345" stroke="white" stroke-width="2" opacity="0.5"/>
+            <line x1="350" y1="380" x2="360" y2="380" stroke="white" stroke-width="2" opacity="0.5"/>
+            <line x1="350" y1="415" x2="360" y2="415" stroke="white" stroke-width="2" opacity="0.5"/>
             <path d="M 210 470 A 40 40 0 0 1 290 470" stroke="white" stroke-width="2" fill="none" opacity="0.6"/>
             <line x1="222" y1="445" x2="278" y2="445" stroke="white" stroke-width="3.5" opacity="0.85"/>
             <circle cx="250" cy="435" r="10" stroke="white" stroke-width="2.5" fill="rgba(200,168,112,0.3)" opacity="0.9"/>
@@ -1470,6 +1476,9 @@
         </div>
         <div class="court-grid" id="drillCourtGrid"></div>
       </div>
+    </div>
+    <div class="btn-row" style="max-width:360px;margin:12px auto 0;">
+      <button class="btn btn-back" onclick="drillGoStep(1)">← 種目リストに戻る</button>
     </div>
   </div>
 </div>
@@ -1490,25 +1499,30 @@
   <div class="drill-section">
     <div class="drill-label">STEP 2 ─ 設定</div>
 
-    <div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">試投数</div>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">練習モード</div>
     <div class="drill-toggle-row">
-      <button class="drill-toggle-btn active" id="drillShotsAll" onclick="drillSetShotsMode('all')">全種目共通</button>
-      <button class="drill-toggle-btn" id="drillShotsEach" onclick="drillSetShotsMode('each')">種目ごと</button>
+      <button class="drill-toggle-btn active" id="drillModeCount" onclick="drillSetPracticeMode('count')">🏀 本数で練習</button>
+      <button class="drill-toggle-btn" id="drillModeTimer" onclick="drillSetPracticeMode('timer')">⏱ タイマーで練習</button>
     </div>
-    <div id="drillShotsAllInput">
-      <div class="drill-setting-row">
-        <div class="drill-setting-label">全種目の試投数</div>
-        <div class="drill-setting-value"><input type="number" id="drillShotsAllNum" value="20" min="1"><span>本</span></div>
-      </div>
-    </div>
-    <div id="drillShotsEachInput" style="display:none;"></div>
 
-    <div style="font-size:13px;color:var(--text-dim);margin:16px 0 8px;">タイマー</div>
-    <div class="drill-toggle-row">
-      <button class="drill-toggle-btn" id="drillTimerOff" onclick="drillSetTimer('off')">⏱ 使わない</button>
-      <button class="drill-toggle-btn active" id="drillTimerOn" onclick="drillSetTimer('on')">⏱ 使う</button>
+    <!-- 本数モード設定 -->
+    <div id="drillCountSettings">
+      <div style="font-size:13px;color:var(--text-dim);margin:12px 0 8px;">試投数</div>
+      <div class="drill-toggle-row">
+        <button class="drill-toggle-btn active" id="drillShotsAll" onclick="drillSetShotsMode('all')">全種目共通</button>
+        <button class="drill-toggle-btn" id="drillShotsEach" onclick="drillSetShotsMode('each')">種目ごと</button>
+      </div>
+      <div id="drillShotsAllInput">
+        <div class="drill-setting-row">
+          <div class="drill-setting-label">全種目の試投数</div>
+          <div class="drill-setting-value"><input type="number" id="drillShotsAllNum" value="20" min="1"><span>本</span></div>
+        </div>
+      </div>
+      <div id="drillShotsEachInput" style="display:none;"></div>
     </div>
-    <div id="drillTimerSettings">
+
+    <!-- タイマーモード設定 -->
+    <div id="drillTimerSettings" style="display:none;">
       <div class="drill-setting-row">
         <div class="drill-setting-label">🏀 シュートタイム</div>
         <div class="drill-setting-value"><input type="number" id="drillShootTime" value="40" min="10"><span>秒</span></div>
@@ -1548,12 +1562,17 @@
     <!-- インターバル中の成功数入力 -->
     <div id="drillIntervalInput" style="display:none;">
       <div class="drill-section">
-        <div class="drill-label" id="drillIntervalLabel">成功数を入力</div>
+        <div class="drill-label" id="drillIntervalLabel">結果を入力</div>
         <div class="drill-input-item">
           <div class="drill-input-header">
             <div class="drill-input-title" id="drillIntervalItemName"></div>
             <div class="drill-input-attempts" id="drillIntervalItemAttempts"></div>
           </div>
+          <div id="drillIntervalAttemptsRow" style="display:none;margin-bottom:8px;">
+            <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">試投数</div>
+            <input type="number" class="drill-input-field" id="drillIntervalAttemptsInput" min="1" placeholder="試投数">
+          </div>
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">成功数</div>
           <input type="number" class="drill-input-field" id="drillIntervalMadeInput" min="0" placeholder="成功数">
         </div>
         <button class="btn btn-next" onclick="drillConfirmIntervalInput()" style="margin-top:8px;">OK →</button>
@@ -2364,7 +2383,6 @@
   // ===== Drill Mode =====
   let drillItems = [];
   let drillShotsMode = 'all';
-  let drillTimerEnabled = true;
   let drillInputTiming = 'during';
   let drillCurrentItem = 0;
   let drillTimerId = null;
@@ -2414,7 +2432,7 @@
       [1,2,3,4,5].forEach(col => {
         const area = row + col;
         const cell = document.createElement('div');
-        cell.className = 'court-cell';
+        cell.className = 'grid-cell';
         cell.textContent = area;
         cell.onclick = () => drillSelectArea(area);
         grid.appendChild(cell);
@@ -2486,12 +2504,43 @@
 
   function drillRenderStep2() { if (drillShotsMode === 'each') drillRenderEachShots(); }
 
-  function drillSetTimer(mode) {
-    drillTimerEnabled = (mode === 'on');
-    document.getElementById('drillTimerOff').classList.toggle('active', mode === 'off');
-    document.getElementById('drillTimerOn').classList.toggle('active', mode === 'on');
-    document.getElementById('drillTimerSettings').style.display = mode === 'on' ? 'block' : 'none';
+  let drillPracticeMode = 'count'; // 'count' | 'timer'
+
+  function drillSetPracticeMode(mode) {
+    drillPracticeMode = mode;
+    document.getElementById('drillModeCount').classList.toggle('active', mode === 'count');
+    document.getElementById('drillModeTimer').classList.toggle('active', mode === 'timer');
+    document.getElementById('drillCountSettings').style.display = mode === 'count' ? 'block' : 'none';
+    document.getElementById('drillTimerSettings').style.display = mode === 'timer' ? 'block' : 'none';
   }
+
+  // ビープ音（Web Audio API）
+  let audioCtx = null;
+  function playBeep(freq, duration, count) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      let i = 0;
+      function beepOnce() {
+        if (i >= count) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'square';
+        gain.gain.value = 0.5;
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + duration / 1000);
+        i++;
+        if (i < count) setTimeout(beepOnce, duration + 100);
+      }
+      beepOnce();
+    } catch(e) { console.log('Audio error:', e); }
+  }
+  function beepCountdown() { playBeep(600, 150, 1); }
+  function beepGo() { playBeep(900, 400, 1); }
+  function beepTimerEnd() { playBeep(1000, 200, 3); }
 
   function drillSetInputTiming(timing) {
     drillInputTiming = timing;
@@ -2500,20 +2549,29 @@
   }
 
   function drillStart() {
-    if (drillShotsMode === 'all') {
-      const num = parseInt(document.getElementById('drillShotsAllNum').value) || 20;
-      drillItems.forEach(item => { item.attempts = num; });
+    // 修正4: モバイルでの音声再生のためAudioContextを初期化
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    if (drillPracticeMode === 'count') {
+      if (drillShotsMode === 'all') {
+        const num = parseInt(document.getElementById('drillShotsAllNum').value) || 20;
+        drillItems.forEach(item => { item.attempts = num; });
+      } else {
+        document.querySelectorAll('.drill-each-shots').forEach(el => {
+          drillItems[parseInt(el.dataset.idx)].attempts = parseInt(el.value) || 20;
+        });
+      }
     } else {
-      document.querySelectorAll('.drill-each-shots').forEach(el => {
-        drillItems[parseInt(el.dataset.idx)].attempts = parseInt(el.value) || 20;
-      });
+      // タイマーモード：試投数は後から入力
+      drillItems.forEach(item => { item.attempts = null; });
     }
     drillItems.forEach(item => { item.made = null; });
     drillCurrentItem = 0;
     document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
     document.getElementById('drillScreen3').classList.add('active');
 
-    if (drillTimerEnabled) {
+    if (drillPracticeMode === 'timer') {
       drillStartCountdown();
     } else {
       document.getElementById('drillCountdown').style.display = 'none';
@@ -2538,8 +2596,8 @@
     numEl.textContent = count;
     drillTimerId = setInterval(() => {
       count--;
-      if (count > 0) { numEl.textContent = count; }
-      else if (count === 0) { numEl.innerHTML = '<div class="drill-countdown-go">GO!</div>'; }
+      if (count > 0) { numEl.textContent = count; beepCountdown(); }
+      else if (count === 0) { numEl.innerHTML = '<div class="drill-countdown-go">GO!</div>'; beepGo(); }
       else { clearInterval(drillTimerId); drillRunTimer(); }
     }, 1000);
   }
@@ -2572,7 +2630,8 @@
       drillTimerId = setInterval(() => {
         remaining--;
         numEl.textContent = remaining;
-        if (remaining <= 0) { clearInterval(drillTimerId); drillTimerEnd(); }
+        if (remaining <= 3 && remaining > 0) beepCountdown();
+        if (remaining <= 0) { clearInterval(drillTimerId); beepTimerEnd(); drillTimerEnd(); }
       }, 1000);
     } else {
       kindEl.textContent = '🚶 INTERVAL';
@@ -2584,7 +2643,8 @@
       drillTimerId = setInterval(() => {
         remaining--;
         numEl.textContent = remaining;
-        if (remaining <= 0) { clearInterval(drillTimerId); drillIntervalEnd(); }
+        if (remaining <= 3 && remaining > 0) beepCountdown();
+        if (remaining <= 0) { clearInterval(drillTimerId); beepTimerEnd(); drillIntervalEnd(); }
       }, 1000);
     }
   }
@@ -2597,10 +2657,17 @@
       document.getElementById('drillIntervalInput').style.display = 'block';
       const item = drillItems[drillCurrentItem];
       document.getElementById('drillIntervalItemName').textContent = item.area + ' / ' + item.lv + ' ' + item.lvName;
-      document.getElementById('drillIntervalItemAttempts').textContent = '試投：' + item.attempts + '本';
+      // タイマーモード：試投数も入力
+      if (drillPracticeMode === 'timer') {
+        document.getElementById('drillIntervalAttemptsRow').style.display = 'block';
+        document.getElementById('drillIntervalItemAttempts').textContent = '';
+        document.getElementById('drillIntervalAttemptsInput').value = '';
+      } else {
+        document.getElementById('drillIntervalAttemptsRow').style.display = 'none';
+        document.getElementById('drillIntervalItemAttempts').textContent = '試投：' + item.attempts + '本';
+      }
       document.getElementById('drillIntervalMadeInput').value = '';
-      document.getElementById('drillIntervalMadeInput').focus();
-      document.getElementById('drillIntervalLabel').textContent = isLast ? '最後の種目 ─ 成功数を入力' : '成功数を入力（インターバル中）';
+      document.getElementById('drillIntervalLabel').textContent = isLast ? '最後の種目 ─ 結果を入力' : '結果を入力（インターバル中）';
     } else {
       if (isLast) { drillGoToInput(); }
       else { drillCurrentItem++; drillPhase = 'interval'; drillShowTimer(); }
@@ -2608,9 +2675,15 @@
   }
 
   function drillConfirmIntervalInput() {
+    const item = drillItems[drillCurrentItem];
+    // タイマーモード：試投数も取得
+    if (drillPracticeMode === 'timer') {
+      const att = parseInt(document.getElementById('drillIntervalAttemptsInput').value);
+      if (isNaN(att) || att <= 0) { alert('試投数を入力してください'); return; }
+      item.attempts = att;
+    }
     const val = parseInt(document.getElementById('drillIntervalMadeInput').value);
     if (isNaN(val) || val < 0) { alert('成功数を入力してください'); return; }
-    const item = drillItems[drillCurrentItem];
     if (val > item.attempts) { alert('成功数が試投数を超えています'); return; }
     item.made = val;
     const isLast = drillCurrentItem >= drillItems.length - 1;
@@ -2634,7 +2707,17 @@
     const list = document.getElementById('drillResultInputList');
     let html = '';
     drillItems.forEach((item, i) => {
-      html += '<div class="drill-input-item"><div class="drill-input-header"><div class="drill-input-title">' + (i+1) + '. ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '</div><div class="drill-input-attempts">試投：' + item.attempts + '本</div></div><input type="number" class="drill-input-field drill-result-input" data-idx="' + i + '" min="0" max="' + item.attempts + '" placeholder="成功数" value="' + (item.made !== null ? item.made : '') + '"></div>';
+      html += '<div class="drill-input-item"><div class="drill-input-header"><div class="drill-input-title">' + (i+1) + '. ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '</div>';
+      if (item.attempts) {
+        html += '<div class="drill-input-attempts">試投：' + item.attempts + '本</div>';
+      }
+      html += '</div>';
+      if (drillPracticeMode === 'timer') {
+        html += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">試投数</div>';
+        html += '<input type="number" class="drill-input-field drill-result-attempts" data-idx="' + i + '" min="1" placeholder="試投数" value="' + (item.attempts || '') + '" style="margin-bottom:8px;">';
+      }
+      html += '<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">成功数</div>';
+      html += '<input type="number" class="drill-input-field drill-result-input" data-idx="' + i + '" min="0" placeholder="成功数" value="' + (item.made !== null ? item.made : '') + '"></div>';
     });
     list.innerHTML = html;
   }
@@ -2642,12 +2725,19 @@
   let drillSending = false;
   function drillSubmitAll() {
     if (drillSending) return;
+    // まとめ入力の場合、値を取得
+    document.querySelectorAll('.drill-result-attempts').forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      const val = parseInt(el.value);
+      if (!isNaN(val) && val > 0) drillItems[idx].attempts = val;
+    });
     document.querySelectorAll('.drill-result-input').forEach(el => {
       const idx = parseInt(el.dataset.idx);
       const val = parseInt(el.value);
       if (!isNaN(val)) drillItems[idx].made = val;
     });
     for (let i = 0; i < drillItems.length; i++) {
+      if (!drillItems[i].attempts || drillItems[i].attempts <= 0) { alert((i+1) + '種目目の試投数を入力してください'); return; }
       if (drillItems[i].made === null || isNaN(drillItems[i].made)) { alert((i+1) + '種目目の成功数を入力してください'); return; }
       if (drillItems[i].made > drillItems[i].attempts) { alert((i+1) + '種目目の成功数が試投数を超えています'); return; }
     }
