@@ -1248,7 +1248,7 @@
   </div>
   <div class="btn-row">
     <button class="btn btn-back" onclick="goToScreen(1)">← 戻る</button>
-    <button class="btn btn-next" id="btnNext2" disabled onclick="goToScreen(3)">次へ →</button>
+    <button class="btn btn-next" id="btnNext2" disabled onclick="handleScreen2Next()">次へ →</button>
   </div>
 </div>
 
@@ -1777,6 +1777,23 @@
     };
     document.getElementById('stepLabel').textContent = labels[num] || '';
 
+    // ドリルモード用ラベル上書き
+    if (typeof drillAddingItem !== 'undefined' && drillAddingItem) {
+      if (num === 1) {
+        document.getElementById('stepLabel').textContent = 'ドリル ─ エリアを選択（' + ((typeof drillItems !== 'undefined' ? drillItems.length : 0) + 1) + '種目目）';
+      }
+      if (num === 2) {
+        document.getElementById('stepLabel').textContent = 'ドリル ─ シュートタイプ選択';
+        // btnNext2をドリル追加ボタンに変更
+        document.getElementById('btnNext2').textContent = '追加 ✓';
+      }
+    } else {
+      // 通常モードに戻す
+      if (num === 2) {
+        document.getElementById('btnNext2').textContent = '次へ →';
+      }
+    }
+
     // Screen2: エリアに応じてLVをフィルタ
     if (num === 2 && selectedArea) {
       const validLVs = VALID_AREA_LV[selectedArea] || [];
@@ -1789,7 +1806,6 @@
           btn.classList.remove('selected');
         }
       });
-      // 選択中のLVが無効になったらリセット
       if (selectedShot && validLVs.indexOf(selectedShot) < 0) {
         selectedShot = null;
         document.getElementById('btnNext2').disabled = true;
@@ -1806,6 +1822,19 @@
       document.getElementById('memoArea').textContent = selectedArea;
       document.getElementById('memoShot').textContent = selectedShot;
       document.getElementById('memoResult').textContent = made + ' / ' + attempts;
+    }
+  }
+
+  function handleScreen2Next() {
+    if (typeof drillAddingItem !== 'undefined' && drillAddingItem) {
+      // ドリルモード：種目を追加して種目リストに戻る
+      drillItems.push({ area: selectedArea, lv: selectedShot, lvName: lvNamesMap[selectedShot] || selectedShot, attempts: 20, made: null });
+      drillAddingItem = false;
+      document.getElementById('drillBackFromCourt').style.display = 'none';
+      document.getElementById('btnNext2').textContent = '次へ →';
+      drillGoStep(1);
+    } else {
+      goToScreen(3);
     }
   }
 
@@ -2458,42 +2487,7 @@
     goToScreen(1);
   }
 
-  // goToScreen をオーバーライド（元の関数を保持）
-  const _originalGoToScreen = goToScreen;
-
-  goToScreen = function(num) {
-    if (drillAddingItem) {
-      if (num === 2) {
-        // エリア選択完了 → LV選択画面へ（通常と同じ）
-        document.getElementById('stepLabel').textContent = 'ドリル ─ シュートタイプ選択';
-        // LVのグレーアウトを更新
-        updateShotButtons();
-      }
-    }
-    _originalGoToScreen(num);
-
-    if (drillAddingItem && num === 1) {
-      document.getElementById('stepLabel').textContent = 'ドリル ─ エリアを選択（' + (drillItems.length + 1) + '種目目）';
-    }
-  };
-
-  // selectShot をオーバーライド
-  const _originalSelectShot = selectShot;
-  selectShot = function(btn) {
-    _originalSelectShot(btn);
-    if (drillAddingItem) {
-      // 「次へ」ボタンのテキストを変更
-      document.getElementById('btnNext2').textContent = '追加 ✓';
-      // 次へボタンのonclickをオーバーライド
-      document.getElementById('btnNext2').onclick = function() {
-        drillItems.push({ area: selectedArea, lv: selectedShot, lvName: lvNamesMap[selectedShot] || selectedShot, attempts: 20, made: null });
-        drillAddingItem = false;
-        document.getElementById('btnNext2').textContent = '次へ →';
-        document.getElementById('btnNext2').onclick = function() { goToScreen(3); };
-        drillGoStep(1);
-      };
-    }
-  };
+  // selectShotにドリル追加処理を追加（元の関数内で判定）
 
   function drillRemoveItem(idx) { drillItems.splice(idx, 1); drillRenderItemList(); }
 
