@@ -2027,6 +2027,39 @@
 
   let isSending = false;
 
+  function getModePayloadValue(mode) {
+    if (mode === 'drill') return 'drill';
+    if (mode === 'pair') return 'pair';
+    return 'single';
+  }
+
+  function buildPostData(params) {
+    const payload = {
+      source: 'liff',
+      userId: liffUserId,
+      mode: getModePayloadValue(params.mode || currentMode),
+      area: params.area,
+      shotType: params.shotType,
+      attempts: params.attempts,
+      made: params.made,
+      memo: params.memo || ''
+    };
+
+    if (typeof params.order === 'number') payload.order = params.order;
+    if (params.mode === 'drill' && params.practiceMode) payload.practiceMode = params.practiceMode;
+    if (params.mode === 'drill' && params.shotsMode) payload.shotsMode = params.shotsMode;
+
+    return payload;
+  }
+
+  function postShotLog(params) {
+    return fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(buildPostData(params))
+    });
+  }
+
   function submitLog() {
     if (isSending) return; // 連打防止
 
@@ -2044,20 +2077,13 @@
     document.getElementById('stepLabel').textContent = '';
 
     // GASに直接POSTで送信
-    const postData = {
-      source: 'liff',
-      userId: liffUserId,
+    postShotLog({
+      mode: 'normal',
       area: selectedArea,
       shotType: selectedShot,
       attempts: attempts,
       made: made,
       memo: memo
-    };
-
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(postData)
     }).then(res => res.json()).then(data => {
       isSending = false;
       if (data.status === 'ok') {
@@ -3115,9 +3141,17 @@
     function sendNext() {
       if (sendIdx >= drillItems.length) { drillSending = false; drillShowComplete(); return; }
       const item = drillItems[sendIdx];
-      const postData = { source: 'liff', userId: liffUserId, area: item.area, shotType: item.lv, attempts: item.attempts, made: item.made, memo: sendIdx === 0 ? memo : '' };
-      fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(postData) })
-        .then(() => { sendIdx++; sendNext(); }).catch(() => { sendIdx++; sendNext(); });
+      postShotLog({
+        mode: 'drill',
+        area: item.area,
+        shotType: item.lv,
+        attempts: item.attempts,
+        made: item.made,
+        memo: sendIdx === 0 ? memo : '',
+        order: sendIdx + 1,
+        practiceMode: drillPracticeMode,
+        shotsMode: drillShotsMode
+      }).then(() => { sendIdx++; sendNext(); }).catch(() => { sendIdx++; sendNext(); });
     }
     sendNext();
   }
@@ -3272,19 +3306,13 @@
     document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
     document.getElementById('pairScreen5').classList.add('active');
     document.getElementById('stepLabel').textContent = '';
-    const postData = {
-      source: 'liff',
-      userId: liffUserId,
+    postShotLog({
+      mode: 'pair',
       area: selectedArea,
       shotType: selectedShot,
       attempts: attempts,
       made: made,
       memo: memo
-    };
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(postData)
     }).then(res => res.json()).then(data => {
       pairSending = false;
       if (data.status === 'ok') {
