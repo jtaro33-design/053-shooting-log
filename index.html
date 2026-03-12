@@ -871,6 +871,7 @@
   .mode-toggle {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
     max-width: 360px;
     margin: 0 auto 12px;
     padding: 0 16px;
@@ -893,6 +894,90 @@
     border-color: var(--gold);
     background: rgba(200,168,112,0.12);
     color: var(--gold);
+  }
+
+  .pair-live-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .pair-live-card {
+    background: var(--card-bg);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .pair-live-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .pair-live-label {
+    margin-top: 4px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .pair-action-row {
+    max-width: 360px;
+    margin: 16px auto 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .pair-mark-btn {
+    min-height: 96px;
+    border-radius: 16px;
+    border: 2px solid rgba(200,168,112,0.2);
+    background: var(--card-bg);
+    color: var(--white-pure);
+    font-size: 34px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .pair-mark-btn:active { transform: scale(0.98); }
+  .pair-mark-btn.made { border-color: rgba(92,184,92,0.6); color: #8CE08C; }
+  .pair-mark-btn.miss { border-color: rgba(217,83,79,0.6); color: #FF9C99; }
+  .pair-sub-actions {
+    max-width: 360px;
+    margin: 12px auto 0;
+    display: flex;
+    gap: 8px;
+  }
+  .pair-mini-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(200,168,112,0.2);
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .pair-history {
+    max-width: 360px;
+    margin: 16px auto 0;
+    min-height: 40px;
+    color: var(--text-dim);
+    font-size: 12px;
+    line-height: 1.8;
+    word-break: break-all;
+  }
+  .pair-history-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin: 0 4px 4px 0;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    font-size: 14px;
+    font-weight: 700;
   }
 
   .drill-screen { display: none; padding: 0 16px 24px; }
@@ -1149,6 +1234,7 @@
 <div class="mode-toggle" id="modeToggle" style="display:none;">
   <button class="mode-btn active" id="modeNormal" onclick="switchMode('normal')">🏀 通常入力</button>
   <button class="mode-btn" id="modeDrill" onclick="switchMode('drill')">🔥 ドリルモード</button>
+  <button class="mode-btn" id="modePair" onclick="switchMode('pair')">🤝 ペアモード</button>
 </div>
 
 <!-- Screen 1: Court -->
@@ -1577,6 +1663,79 @@
   </div>
 </div>
 
+
+
+<!-- ===== Pair Mode Screens ===== -->
+<div class="drill-screen" id="pairScreen3">
+  <div class="drill-section">
+    <div class="drill-label">PAIR MODE ─ 〇×を入力</div>
+    <div class="selected-summary">
+      <div class="summary-item"><div class="summary-label">AREA</div><div class="summary-value" id="pairSummaryArea">-</div></div>
+      <div class="summary-item"><div class="summary-label">SHOT</div><div class="summary-value" id="pairSummaryShot">-</div></div>
+    </div>
+    <div style="max-width:360px;margin:0 auto;color:var(--text-dim);font-size:13px;line-height:1.7;">保護者・パートナーが、その場で <strong>〇 / ×</strong> を押して記録します。</div>
+    <div class="pair-live-grid">
+      <div class="pair-live-card"><div class="pair-live-num" id="pairAttemptsNum">0</div><div class="pair-live-label">試投数</div></div>
+      <div class="pair-live-card"><div class="pair-live-num" id="pairMadeNum">0</div><div class="pair-live-label">成功数</div></div>
+      <div class="pair-live-card"><div class="pair-live-num" id="pairMissNum">0</div><div class="pair-live-label">失敗数</div></div>
+      <div class="pair-live-card"><div class="pair-live-num" id="pairRateNum">0%</div><div class="pair-live-label">成功率</div></div>
+    </div>
+  </div>
+  <div class="pair-action-row">
+    <button class="pair-mark-btn made" onclick="pairMarkResult(true)">〇</button>
+    <button class="pair-mark-btn miss" onclick="pairMarkResult(false)">×</button>
+  </div>
+  <div class="pair-sub-actions">
+    <button class="pair-mini-btn" onclick="pairUndoLast()">1つ戻す</button>
+    <button class="pair-mini-btn" onclick="pairClearResults()">リセット</button>
+  </div>
+  <div class="pair-history" id="pairHistory">まだ入力はありません</div>
+  <div class="btn-row" style="max-width:360px;margin:16px auto 0;">
+    <button class="btn btn-back" onclick="pairBackToShotSelection()">← 戻る</button>
+    <button class="btn btn-submit" onclick="pairFinishSession()">練習完了 ✓</button>
+  </div>
+</div>
+
+<div class="drill-screen" id="pairScreen4">
+  <div class="drill-section">
+    <div class="drill-label">PAIR MODE ─ メモと確認</div>
+    <div class="memo-summary">
+      <div class="memo-summary-row"><span class="memo-summary-label">エリア</span><span class="memo-summary-val" id="pairMemoArea">-</span></div>
+      <div class="memo-summary-row"><span class="memo-summary-label">シュート種類</span><span class="memo-summary-val" id="pairMemoShot">-</span></div>
+      <div class="memo-summary-row"><span class="memo-summary-label">試投数</span><span class="memo-summary-val" id="pairMemoAttempts">0</span></div>
+      <div class="memo-summary-row"><span class="memo-summary-label">成功数</span><span class="memo-summary-val" id="pairMemoMade">0</span></div>
+      <div class="memo-summary-row"><span class="memo-summary-label">失敗数</span><span class="memo-summary-val" id="pairMemoMiss">0</span></div>
+      <div class="memo-summary-row"><span class="memo-summary-label">成功率</span><span class="memo-summary-val" id="pairMemoRate">0%</span></div>
+    </div>
+    <div class="memo-label">メモ（任意）</div>
+    <textarea class="memo-textarea" id="pairMemoText" placeholder="気づいたことがあれば入力&#10;例：リズム良く打てた、左側でズレが出た 等"></textarea>
+    <div class="memo-skip">※ 空欄のまま送信してもOKです</div>
+  </div>
+  <div class="btn-row" style="max-width:360px;margin:16px auto 0;">
+    <button class="btn btn-back" onclick="pairBackToRecord()">← 戻る</button>
+    <button class="btn btn-submit" onclick="pairSubmitLog()">記録する ✓</button>
+  </div>
+</div>
+
+<div class="drill-screen" id="pairScreen5">
+  <div style="text-align:center; padding-top:60px;">
+    <div style="font-size:48px; margin-bottom:16px; animation: bounce 1s infinite;">🤝</div>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:24px; color:var(--gold); letter-spacing:3px;">SENDING...</div>
+    <div style="color:var(--text); font-size:15px; margin-top:16px;">ペアモードのデータを送信しています</div>
+    <div style="margin-top:24px;"><div style="width:40px;height:40px;border:3px solid rgba(200,168,112,0.2);border-top:3px solid var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto;"></div></div>
+  </div>
+</div>
+
+<div class="drill-screen" id="pairScreen6">
+  <div style="text-align:center; padding-top:40px;">
+    <div style="font-size:56px; margin-bottom:12px;">🎉</div>
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:28px; color:var(--gold); letter-spacing:3px;">PAIR COMPLETE!</div>
+    <div id="pairCompleteStats" style="margin-top:16px; color:var(--text); font-size:14px; line-height:2;"></div>
+    <button class="btn btn-next" onclick="pairReset()" style="margin-top:24px;">もう1セット 🔄</button>
+    <button class="btn btn-back" onclick="switchMode('normal')" style="margin-top:8px;">通常入力に戻る</button>
+  </div>
+</div>
+
 <!-- ===== Report Page ===== -->
 <div class="report-page" id="reportPage">
   <div class="report-header">
@@ -1783,7 +1942,10 @@
     for (let i = 1; i <= 3; i++) {
       document.getElementById('line' + i).classList.toggle('done', i < num);
     }
-    const labels = {
+    const labels = currentMode === 'pair' ? {
+      1: 'STEP 1 ─ エリアを選択',
+      2: 'STEP 2 ─ シュート種類を選択'
+    } : {
       1: 'STEP 1 ─ エリアを選択',
       2: 'STEP 2 ─ シュート種類を選択',
       3: 'STEP 3 ─ 本数を入力',
@@ -1854,6 +2016,10 @@
       document.getElementById('drillBackFromCourt').style.display = 'none';
       document.getElementById('btnNext2').textContent = '次へ →';
       drillGoStep(1);
+      return;
+    }
+    if (currentMode === 'pair') {
+      pairGoToRecord();
       return;
     }
     goToScreen(3);
@@ -2039,10 +2205,16 @@
         if (!document.querySelector('.screen.active')) {
           goToScreen(1);
         }
-      } else {
+      } else if (currentMode === 'drill') {
         stepsEl.style.display = 'none';
         stepLabel.style.display = 'none';
         drillGoStep(1);
+      } else {
+        stepsEl.style.display = 'flex';
+        stepLabel.style.display = 'block';
+        if (!document.querySelector('.screen.active')) {
+          goToScreen(1);
+        }
       }
     } else if (tab === 'trophy') {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -2393,6 +2565,8 @@
   let currentMode = 'normal';
   let drillSending = false;
   let drillState = 'builder';
+  let pairResults = [];
+  let pairSending = false;
 
   function drillSetState(state) {
     drillState = state;
@@ -2512,6 +2686,7 @@
     document.getElementById('drillBackFromCourt').style.display = 'none';
     document.getElementById('modeNormal').classList.toggle('active', mode === 'normal');
     document.getElementById('modeDrill').classList.toggle('active', mode === 'drill');
+    document.getElementById('modePair').classList.toggle('active', mode === 'pair');
     const stepsEl = document.querySelector('.steps');
     const stepLabel = document.getElementById('stepLabel');
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -2520,10 +2695,15 @@
       stepsEl.style.display = 'flex';
       stepLabel.style.display = 'block';
       goToScreen(1);
-    } else {
+    } else if (mode === 'drill') {
       stepsEl.style.display = 'none';
       stepLabel.style.display = 'none';
       drillGoStep(1);
+    } else {
+      pairResetSelectionOnly();
+      stepsEl.style.display = 'flex';
+      stepLabel.style.display = 'block';
+      goToScreen(1);
     }
   }
 
@@ -2909,6 +3089,176 @@
     document.getElementById('drillMemo').value = '';
     drillResetCourseSelection();
     drillGoStep(1);
+  }
+
+
+
+  // ===== Pair Mode =====
+  function pairResetSelectionOnly() {
+    selectedArea = null;
+    selectedShot = null;
+    document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.shot-btn').forEach(btn => btn.classList.remove('selected'));
+    document.getElementById('btnNext1').disabled = true;
+    document.getElementById('btnNext2').disabled = true;
+    document.getElementById('btnNext2').textContent = '次へ →';
+  }
+
+  function pairResetSession(keepSelection) {
+    pairResults = [];
+    pairSending = false;
+    if (!keepSelection) pairResetSelectionOnly();
+    const memo = document.getElementById('pairMemoText');
+    if (memo) memo.value = '';
+    pairRenderLive();
+  }
+
+  function pairRenderLive() {
+    const attempts = pairResults.length;
+    const made = pairResults.filter(Boolean).length;
+    const miss = attempts - made;
+    const rate = attempts > 0 ? Math.round((made / attempts) * 100) : 0;
+    const attemptsEl = document.getElementById('pairAttemptsNum');
+    const madeEl = document.getElementById('pairMadeNum');
+    const missEl = document.getElementById('pairMissNum');
+    const rateEl = document.getElementById('pairRateNum');
+    if (attemptsEl) attemptsEl.textContent = String(attempts);
+    if (madeEl) madeEl.textContent = String(made);
+    if (missEl) missEl.textContent = String(miss);
+    if (rateEl) rateEl.textContent = rate + '%';
+    const historyEl = document.getElementById('pairHistory');
+    if (historyEl) {
+      historyEl.innerHTML = pairResults.length === 0
+        ? 'まだ入力はありません'
+        : pairResults.map(v => '<span class="pair-history-chip">' + (v ? '〇' : '×') + '</span>').join('');
+    }
+  }
+
+  function pairGoToRecord() {
+    pairResetSession(true);
+    drillCloseActiveScreens();
+    document.querySelector('.steps').style.display = 'none';
+    document.getElementById('stepLabel').style.display = 'block';
+    document.getElementById('stepLabel').textContent = 'PAIR MODE ─ 〇 / × を入力';
+    document.getElementById('pairSummaryArea').textContent = selectedArea || '-';
+    document.getElementById('pairSummaryShot').textContent = selectedShot || '-';
+    document.getElementById('pairScreen3').classList.add('active');
+    pairRenderLive();
+  }
+
+  function pairMarkResult(isMade) {
+    pairResults.push(!!isMade);
+    pairRenderLive();
+  }
+
+  function pairUndoLast() {
+    if (pairResults.length === 0) return;
+    pairResults.pop();
+    pairRenderLive();
+  }
+
+  function pairClearResults() {
+    pairResults = [];
+    pairRenderLive();
+  }
+
+  function pairBackToShotSelection() {
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.steps').style.display = 'flex';
+    document.getElementById('stepLabel').style.display = 'block';
+    goToScreen(2);
+  }
+
+  function pairFinishSession() {
+    const attempts = pairResults.length;
+    if (attempts <= 0) {
+      alert('〇または×を1回以上入力してください');
+      return;
+    }
+    const made = pairResults.filter(Boolean).length;
+    const miss = attempts - made;
+    const rate = attempts > 0 ? Math.round((made / attempts) * 100) : 0;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.steps').style.display = 'none';
+    document.getElementById('stepLabel').style.display = 'block';
+    document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
+    document.getElementById('pairMemoArea').textContent = selectedArea || '-';
+    document.getElementById('pairMemoShot').textContent = selectedShot || '-';
+    document.getElementById('pairMemoAttempts').textContent = String(attempts);
+    document.getElementById('pairMemoMade').textContent = String(made);
+    document.getElementById('pairMemoMiss').textContent = String(miss);
+    document.getElementById('pairMemoRate').textContent = rate + '%';
+    document.getElementById('pairScreen4').classList.add('active');
+  }
+
+  function pairBackToRecord() {
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.steps').style.display = 'none';
+    document.getElementById('stepLabel').style.display = 'block';
+    document.getElementById('stepLabel').textContent = 'PAIR MODE ─ 〇 / × を入力';
+    document.getElementById('pairScreen3').classList.add('active');
+    pairRenderLive();
+  }
+
+  function pairSubmitLog() {
+    if (pairSending) return;
+    const attempts = pairResults.length;
+    const made = pairResults.filter(Boolean).length;
+    if (attempts <= 0) {
+      alert('試投数が0です。〇または×を入力してください');
+      return;
+    }
+    const memo = (document.getElementById('pairMemoText') || { value:'' }).value.trim();
+    const rate = Math.round((made / attempts) * 100);
+    pairSending = true;
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('pairScreen5').classList.add('active');
+    document.getElementById('stepLabel').textContent = '';
+    const postData = {
+      source: 'liff',
+      userId: liffUserId,
+      area: selectedArea,
+      shotType: selectedShot,
+      attempts: attempts,
+      made: made,
+      memo: memo
+    };
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(postData)
+    }).then(res => res.json()).then(data => {
+      pairSending = false;
+      if (data.status === 'ok') {
+        pairShowComplete(rate, attempts, made);
+      } else {
+        alert(data.message || '保存に失敗しました');
+        document.getElementById('pairScreen5').classList.remove('active');
+        document.getElementById('pairScreen4').classList.add('active');
+      }
+    }).catch(err => {
+      console.log('PAIR POST error:', err);
+      pairSending = false;
+      pairShowComplete(rate, attempts, made);
+    });
+  }
+
+  function pairShowComplete(rate, attempts, made) {
+    const miss = attempts - made;
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('pairScreen6').classList.add('active');
+    document.getElementById('pairCompleteStats').innerHTML =
+      '<strong>' + selectedArea + '</strong> エリア ─ <strong>' + selectedShot + '</strong><br>' +
+      '試投数：<strong>' + attempts + '</strong><br>' +
+      '成功数：<strong>' + made + '</strong><br>' +
+      '失敗数：<strong>' + miss + '</strong><br>' +
+      '<strong>成功率：' + rate + '%</strong>';
+  }
+
+  function pairReset() {
+    pairResetSession(false);
+    switchMode('pair');
   }
 
   bindDrillNumericInputs(document);
