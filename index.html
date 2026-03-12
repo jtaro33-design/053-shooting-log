@@ -2568,8 +2568,60 @@
   let pairResults = [];
   let pairSending = false;
 
+  const DRILL_STATES = {
+    BUILDER: 'builder',
+    SETTINGS: 'settings',
+    RUNNING: 'running',
+    INPUT: 'input',
+    SENDING: 'sending',
+    COMPLETE: 'complete'
+  };
+
   function drillSetState(state) {
     drillState = state;
+  }
+
+  function drillIsState(state) {
+    return drillState === state;
+  }
+
+  function drillShowOnlyDrillScreen(screenId) {
+    drillCloseActiveScreens();
+    document.querySelector('.steps').style.display = 'none';
+    document.getElementById('stepLabel').style.display = 'none';
+    if (screenId) document.getElementById(screenId).classList.add('active');
+  }
+
+  function drillEnterBuilder() {
+    drillSetState(DRILL_STATES.BUILDER);
+    drillShowOnlyDrillScreen('drillScreen1');
+    drillRenderItemList();
+  }
+
+  function drillEnterSettings() {
+    drillSetState(DRILL_STATES.SETTINGS);
+    drillShowOnlyDrillScreen('drillScreen2');
+    drillRenderStep2();
+  }
+
+  function drillEnterRunning() {
+    drillSetState(DRILL_STATES.RUNNING);
+    drillShowOnlyDrillScreen('drillScreen3');
+  }
+
+  function drillEnterInput() {
+    drillSetState(DRILL_STATES.INPUT);
+    drillShowOnlyDrillScreen('drillScreen4');
+  }
+
+  function drillEnterSending() {
+    drillSetState(DRILL_STATES.SENDING);
+    drillShowOnlyDrillScreen('drillScreen5');
+  }
+
+  function drillEnterComplete() {
+    drillSetState(DRILL_STATES.COMPLETE);
+    drillShowOnlyDrillScreen('drillScreen6');
   }
 
   function drillClearTimer() {
@@ -2616,6 +2668,10 @@
     const intervalMade = document.getElementById('drillIntervalMadeInput');
     if (intervalAttempts) intervalAttempts.value = '';
     if (intervalMade) intervalMade.value = '';
+    document.getElementById('drillCountdown').style.display = 'none';
+    document.getElementById('drillTimerDisplay').style.display = 'none';
+    document.getElementById('drillIntervalInput').style.display = 'none';
+    document.getElementById('drillFreeMode').style.display = 'none';
   }
 
   const lvNamesMap = { LV1:'リム', LV2:'フローター', LV3:'ミドル', LV4:'3P', LV5:'Deep3P', LV6:'FT' };
@@ -2724,18 +2780,11 @@
     drillAddingItem = false;
     document.getElementById('drillBackFromCourt').style.display = 'none';
     document.getElementById('btnNext2').textContent = '次へ →';
-    drillCloseActiveScreens();
-    document.querySelector('.steps').style.display = 'none';
-    document.getElementById('stepLabel').style.display = 'none';
 
     if (step === 1) {
-      drillSetState('builder');
-      document.getElementById('drillScreen1').classList.add('active');
-      drillRenderItemList();
+      drillEnterBuilder();
     } else if (step === 2) {
-      drillSetState('settings');
-      document.getElementById('drillScreen2').classList.add('active');
-      drillRenderStep2();
+      drillEnterSettings();
     }
   }
 
@@ -2743,7 +2792,7 @@
   function drillAddItem() {
     if (drillItems.length >= 5) { alert('最大5種目までです'); return; }
     drillAddingItem = true;
-    drillSetState('builder');
+    drillSetState(DRILL_STATES.BUILDER);
 
     drillCloseActiveScreens();
     document.querySelector('.steps').style.display = 'flex';
@@ -2808,7 +2857,10 @@
     bindDrillNumericInputs(c);
   }
 
-  function drillRenderStep2() { if (drillShotsMode === 'each') drillRenderEachShots(); bindDrillNumericInputs(document.getElementById('drillScreen2')); }
+  function drillRenderStep2() {
+    if (drillShotsMode === 'each') drillRenderEachShots();
+    bindDrillNumericInputs(document.getElementById('drillScreen2'));
+  }
 
   function drillSetInputTiming(timing) {
     drillInputTiming = timing;
@@ -2867,10 +2919,7 @@
 
     drillItems.forEach(item => { item.made = null; });
     resetDrillExecutionState();
-
-    drillCloseActiveScreens();
-    drillSetState('running');
-    document.getElementById('drillScreen3').classList.add('active');
+    drillEnterRunning();
 
     if (drillPracticeMode === 'timer') {
       drillStartCountdown();
@@ -2909,6 +2958,33 @@
     document.getElementById('drillIntervalInput').style.display = 'none';
     drillPhase = 'shoot';
     drillShowTimer();
+  }
+
+  function drillMoveToNextTimedStep() {
+    const isLast = drillCurrentItem >= drillItems.length - 1;
+    if (isLast) {
+      drillGoToInput();
+      return;
+    }
+    drillCurrentItem++;
+    drillPhase = 'interval';
+    drillShowTimer();
+  }
+
+  function drillShowIntervalInput(item, isLast) {
+    document.getElementById('drillTimerDisplay').style.display = 'none';
+    document.getElementById('drillIntervalInput').style.display = 'block';
+    const attemptsRow = document.getElementById('drillIntervalAttemptsRow');
+    const attemptsInput = document.getElementById('drillIntervalAttemptsInput');
+    document.getElementById('drillIntervalItemName').textContent = item.area + ' / ' + item.lv + ' ' + item.lvName;
+    document.getElementById('drillIntervalItemAttempts').textContent = item.attempts ? ('試投：' + item.attempts + '本') : '';
+    attemptsRow.style.display = item.attempts === null ? 'block' : 'none';
+    attemptsInput.value = item.attempts || '';
+    document.getElementById('drillIntervalMadeInput').value = item.made !== null ? item.made : '';
+    bindDrillNumericInputs(document.getElementById('drillScreen3'));
+    document.getElementById('drillIntervalLabel').textContent = isLast ? '最後の種目 ─ 結果を入力' : 'インターバル中に結果を入力';
+    if (item.attempts === null) attemptsInput.focus();
+    else document.getElementById('drillIntervalMadeInput').focus();
   }
 
   function drillShowTimer() {
@@ -2955,23 +3031,10 @@
     try { navigator.vibrate && navigator.vibrate([200,100,200]); } catch(e) {}
     const isLast = drillCurrentItem >= drillItems.length - 1;
     if (drillInputTiming === 'during') {
-      document.getElementById('drillTimerDisplay').style.display = 'none';
-      document.getElementById('drillIntervalInput').style.display = 'block';
       const item = drillItems[drillCurrentItem];
-      const attemptsRow = document.getElementById('drillIntervalAttemptsRow');
-      const attemptsInput = document.getElementById('drillIntervalAttemptsInput');
-      document.getElementById('drillIntervalItemName').textContent = item.area + ' / ' + item.lv + ' ' + item.lvName;
-      document.getElementById('drillIntervalItemAttempts').textContent = item.attempts ? ('試投：' + item.attempts + '本') : '';
-      attemptsRow.style.display = item.attempts === null ? 'block' : 'none';
-      attemptsInput.value = item.attempts || '';
-      document.getElementById('drillIntervalMadeInput').value = item.made !== null ? item.made : '';
-      bindDrillNumericInputs(document.getElementById('drillScreen3'));
-      document.getElementById('drillIntervalLabel').textContent = isLast ? '最後の種目 ─ 結果を入力' : 'インターバル中に結果を入力';
-      if (item.attempts === null) attemptsInput.focus();
-      else document.getElementById('drillIntervalMadeInput').focus();
+      drillShowIntervalInput(item, isLast);
     } else {
-      if (isLast) { drillGoToInput(); }
-      else { drillCurrentItem++; drillPhase = 'interval'; drillShowTimer(); }
+      drillMoveToNextTimedStep();
     }
   }
 
@@ -2990,10 +3053,8 @@
     }
     if (item.attempts && val > item.attempts) { alert('成功数が試投数を超えています'); return; }
     item.made = val;
-    const isLast = drillCurrentItem >= drillItems.length - 1;
     document.getElementById('drillIntervalInput').style.display = 'none';
-    if (isLast) { drillGoToInput(); }
-    else { drillCurrentItem++; drillPhase = 'interval'; drillShowTimer(); }
+    drillMoveToNextTimedStep();
   }
 
   function drillIntervalEnd() { drillPhase = 'shoot'; drillShowTimer(); }
@@ -3008,9 +3069,7 @@
   function drillFinishFree() { drillGoToInput(); }
 
   function drillGoToInput() {
-    drillSetState('input');
-    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('drillScreen4').classList.add('active');
+    drillEnterInput();
     const list = document.getElementById('drillResultInputList');
     let html = '';
     drillItems.forEach((item, i) => {
@@ -3050,8 +3109,7 @@
     }
     drillSending = true;
     const memo = document.getElementById('drillMemo') ? document.getElementById('drillMemo').value.trim() : '';
-    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('drillScreen5').classList.add('active');
+    drillEnterSending();
 
     let sendIdx = 0;
     function sendNext() {
@@ -3065,8 +3123,7 @@
   }
 
   function drillShowComplete() {
-    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('drillScreen6').classList.add('active');
+    drillEnterComplete();
     let totalAttempts = 0, totalMade = 0;
     let html = '';
     drillItems.forEach(item => {
@@ -3084,7 +3141,7 @@
     drillItems = [];
     drillAddingItem = false;
     resetDrillExecutionState();
-    drillSetState('builder');
+    drillSetState(DRILL_STATES.BUILDER);
     document.getElementById('drillIntervalInput').style.display = 'none';
     document.getElementById('drillMemo').value = '';
     drillResetCourseSelection();
