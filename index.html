@@ -2084,14 +2084,20 @@
       attempts: attempts,
       made: made,
       memo: memo
-    }).then(res => res.json()).then(data => {
-      isSending = false;
-      if (data.status === 'ok') {
-        showSuccess(rate);
-      } else {
-        alert(data.message || '保存に失敗しました');
-        goToScreen(4);
-      }
+   }).then(res => {
+  if (!res.ok) {
+    throw new Error('HTTP ' + res.status);
+  }
+  return res.json();
+}).then(data => {
+  isSending = false;
+  if (data && data.status === 'ok') {
+    showSuccess(rate);
+  } else {
+    alert((data && data.message) || '保存に失敗しました');
+    goToScreen(4);
+  }
+})
     }).catch(err => {
   console.log('POST error:', err);
   isSending = false;
