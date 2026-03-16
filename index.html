@@ -3324,10 +3324,12 @@
         document.getElementById('pairScreen4').classList.add('active');
       }
     }).catch(err => {
-      console.log('PAIR POST error:', err);
-      pairSending = false;
-      pairShowComplete(rate, attempts, made);
-    });
+  console.log('PAIR POST error:', err);
+  pairSending = false;
+  alert('通信エラーが発生しました。保存できていない可能性があります。');
+  document.getElementById('pairScreen5').classList.remove('active');
+  document.getElementById('pairScreen4').classList.add('active');
+});
   }
 
   function pairShowComplete(rate, attempts, made) {
