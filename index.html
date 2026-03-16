@@ -2093,10 +2093,11 @@
         goToScreen(4);
       }
     }).catch(err => {
-      console.log('POST error:', err);
-      isSending = false;
-      showSuccess(rate);
-    });
+  console.log('POST error:', err);
+  isSending = false;
+  alert('通信エラーが発生しました。保存できていない可能性があります。');
+  goToScreen(4);
+});
   }
 
   function showSuccess(rate) {
