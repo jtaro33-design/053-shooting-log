@@ -2061,50 +2061,59 @@
   }
 
   function submitLog() {
-    if (isSending) return; // 連打防止
+  if (isSending) return; // 連打防止
 
-    const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
-    const made = parseInt(document.getElementById('madeInput').value) || 0;
-    const memo = document.getElementById('memoText').value.trim();
-    if (attempts === 0) { alert('試投数を入力してください'); return; }
-    if (made > attempts) { alert('成功数が試投数を超えています'); return; }
-    const rate = Math.round((made / attempts) * 100);
+  const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
+  const made = parseInt(document.getElementById('madeInput').value) || 0;
+  const memo = document.getElementById('memoText').value.trim();
 
-    // 送信中画面を表示
-    isSending = true;
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('screenSending').classList.add('active');
-    document.getElementById('stepLabel').textContent = '';
+  if (attempts === 0) {
+    alert('試投数を入力してください');
+    return;
+  }
 
-    // GASに直接POSTで送信
-    postShotLog({
-      mode: 'normal',
-      area: selectedArea,
-      shotType: selectedShot,
-      attempts: attempts,
-      made: made,
-      memo: memo
-   }).then(res => {
-  if (!res.ok) {
-    throw new Error('HTTP ' + res.status);
+  if (made > attempts) {
+    alert('成功数が試投数を超えています');
+    return;
   }
-  return res.json();
-}).then(data => {
-  isSending = false;
-  if (data && data.status === 'ok') {
-    showSuccess(rate);
-  } else {
-    alert((data && data.message) || '保存に失敗しました');
-    goToScreen(4);
-  }
-})
-    }).catch(err => {
-  console.error('POST error:', err);
-  isSending = false;
-  alert('通信エラーが発生しました。もう一度お試しください。');
-  goToScreen(4);
-});
-  }
+
+  const rate = Math.round((made / attempts) * 100);
+
+  isSending = true;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screenSending').classList.add('active');
+  document.getElementById('stepLabel').textContent = '';
+
+  postShotLog({
+    mode: 'normal',
+    area: selectedArea,
+    shotType: selectedShot,
+    attempts: attempts,
+    made: made,
+    memo: memo
+  })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status);
+      }
+      return res.json();
+    })
+    .then(data => {
+      isSending = false;
+      if (data && data.status === 'ok') {
+        showSuccess(rate);
+      } else {
+        alert((data && data.message) || '保存に失敗しました');
+        goToScreen(4);
+      }
+    })
+    .catch(err => {
+      console.error('POST error:', err);
+      isSending = false;
+      alert('通信エラーが発生しました。もう一度お試しください。');
+      goToScreen(4);
+    });
+}
 
   function showSuccess(rate) {
     const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
