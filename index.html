@@ -3343,7 +3343,7 @@
     const miss = attempts - made;
     document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
     document.getElementById('pairScreen6').classList.add('active');
-    document.getElementById('stepLabel').textContent = 'PAIR COMPLETE!';
+    
     document.getElementById('pairCompleteStats').innerHTML =
       '<strong>' + selectedArea + '</strong> エリア ─ <strong>' + selectedShot + '</strong><br>' +
       '試投数：<strong>' + attempts + '</strong><br>' +
