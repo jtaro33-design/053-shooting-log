@@ -3350,7 +3350,7 @@ function pairSubmitLog() {
       document.getElementById('pairScreen4').classList.add('active');
       document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
     }
-  }).catch(err => {
+  .catch(err => {
     console.error('PAIR POST error:', err);
     pairSending = false;
     alert('通信エラーが発生しました。もう一度お試しください。');
