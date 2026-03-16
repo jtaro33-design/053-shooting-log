@@ -3330,11 +3330,12 @@
         document.getElementById('pairScreen4').classList.add('active');
       }
     }).catch(err => {
-  console.log('PAIR POST error:', err);
+  console.error('PAIR POST error:', err);
   pairSending = false;
-  alert('通信エラーが発生しました。保存できていない可能性があります。');
+  alert('通信エラーが発生しました。もう一度お試しください。');
   document.getElementById('pairScreen5').classList.remove('active');
   document.getElementById('pairScreen4').classList.add('active');
+  document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
 });
   }
 
