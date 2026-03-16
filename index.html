@@ -2099,9 +2099,9 @@
   }
 })
     }).catch(err => {
-  console.log('POST error:', err);
+  console.error('POST error:', err);
   isSending = false;
-  alert('通信エラーが発生しました。保存できていない可能性があります。');
+  alert('通信エラーが発生しました。もう一度お試しください。');
   goToScreen(4);
 });
   }
