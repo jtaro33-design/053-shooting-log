@@ -1809,32 +1809,29 @@
 
  function checkUserStatus(userId) {
   var callbackName = 'userCheck_' + Date.now();
+  var finished = false;
+
+  function cleanup() {
+    if (window[callbackName]) delete window[callbackName];
+    if (script && script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+  }
 
   window[callbackName] = function(data) {
-    try {
-      delete window[callbackName];
-      if (script && script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
+    finished = true;
+    cleanup();
 
-      if (data && data.status === 'active') {
-        showScreen('screen1');
-        document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
-        document.querySelectorAll('.steps')[0].style.display = 'flex';
-        document.getElementById('bottomNav').style.display = 'flex';
-        document.getElementById('modeToggle').style.display = 'flex';
-      } else {
-        showScreen('screenRegister');
-        document.getElementById('stepLabel').textContent = '';
-        document.querySelectorAll('.steps')[0].style.display = 'none';
-      }
-    } catch (e) {
-      console.error('checkUser callback error:', e);
+    if (data && data.status === 'active') {
       showScreen('screen1');
       document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
       document.querySelectorAll('.steps')[0].style.display = 'flex';
       document.getElementById('bottomNav').style.display = 'flex';
       document.getElementById('modeToggle').style.display = 'flex';
+    } else {
+      showScreen('screenRegister');
+      document.getElementById('stepLabel').textContent = '';
+      document.querySelectorAll('.steps')[0].style.display = 'none';
     }
   };
 
@@ -1842,11 +1839,9 @@
   script.src = GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId) + '&callback=' + callbackName;
 
   script.onerror = function() {
-    delete window[callbackName];
-    if (script && script.parentNode) {
-      script.parentNode.removeChild(script);
-    }
-    console.error('checkUserStatus JSONP error');
+    finished = true;
+    cleanup();
+    alert('ユーザー確認の通信に失敗しました');
     showScreen('screen1');
     document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
     document.querySelectorAll('.steps')[0].style.display = 'flex';
@@ -1857,18 +1852,14 @@
   document.body.appendChild(script);
 
   setTimeout(function() {
-    if (window[callbackName]) {
-      delete window[callbackName];
-      if (script && script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-      console.error('checkUserStatus timeout');
-      showScreen('screen1');
-      document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
-      document.querySelectorAll('.steps')[0].style.display = 'flex';
-      document.getElementById('bottomNav').style.display = 'flex';
-      document.getElementById('modeToggle').style.display = 'flex';
-    }
+    if (finished) return;
+    cleanup();
+    alert('ユーザー確認がタイムアウトしました');
+    showScreen('screen1');
+    document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
+    document.querySelectorAll('.steps')[0].style.display = 'flex';
+    document.getElementById('bottomNav').style.display = 'flex';
+    document.getElementById('modeToggle').style.display = 'flex';
   }, 5000);
 }
 
