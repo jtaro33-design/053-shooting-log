@@ -1786,96 +1786,42 @@
   // ===== LIFF =====
   const LIFF_ID = '2009325083-qDkPrSGU';
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzmTEyG5YwzVLn_Fou8jRWqD7zXOpZ38ljCn4V3dFYlBqXR9G9ApO-WwZb25hJUgsJd/exec';
+
   let liffReady = false;
   let liffUserId = null;
-
-  liff.init({ liffId: LIFF_ID }).then(() => {
-    liffReady = true;
-    if (!liff.isLoggedIn()) {
-      liff.login();
-      return;
-    }
-    liff.getProfile().then((profile) => {
-      liffUserId = profile.userId;
-      checkUserStatus(profile.userId);
-    }).catch((err) => {
-      console.log('getProfile error:', err);
-      showScreen('screen1');
-    });
-  }).catch((err) => {
-    console.log('LIFF init error:', err);
-    showScreen('screen1');
-  });
-
- function checkUserStatus(userId) {
-  var callbackName = 'userCheck_' + Date.now();
-  var finished = false;
-
-  function cleanup() {
-    if (window[callbackName]) delete window[callbackName];
-    if (script && script.parentNode) {
-      script.parentNode.removeChild(script);
-    }
-  }
-
-  window[callbackName] = function(data) {
-    finished = true;
-    cleanup();
-
-    if (data && data.status === 'active') {
-      showScreen('screen1');
-      document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
-      document.querySelectorAll('.steps')[0].style.display = 'flex';
-      document.getElementById('bottomNav').style.display = 'flex';
-      document.getElementById('modeToggle').style.display = 'flex';
-    } else {
-      showScreen('screenRegister');
-      document.getElementById('stepLabel').textContent = '';
-      document.querySelectorAll('.steps')[0].style.display = 'none';
-    }
-  };
-
-  var script = document.createElement('script');
-  script.src = GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId) + '&callback=' + callbackName;
-
-  script.onerror = function() {
-    finished = true;
-    cleanup();
-    alert('ユーザー確認の通信に失敗しました');
-    showScreen('screen1');
-    document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
-    document.querySelectorAll('.steps')[0].style.display = 'flex';
-    document.getElementById('bottomNav').style.display = 'flex';
-    document.getElementById('modeToggle').style.display = 'flex';
-  };
-
-  document.body.appendChild(script);
-
-  setTimeout(function() {
-    if (finished) return;
-    cleanup();
-    alert('ユーザー確認がタイムアウトしました');
-    showScreen('screen1');
-    document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
-    document.querySelectorAll('.steps')[0].style.display = 'flex';
-    document.getElementById('bottomNav').style.display = 'flex';
-    document.getElementById('modeToggle').style.display = 'flex';
-  }, 5000);
-}
-
-  function closeLiff() {
-    if (liffReady && liff.isInClient()) {
-      liff.closeWindow();
-    } else {
-      window.close();
-    }
-  }
-
   let selectedArea = null;
   let selectedShot = null;
+  let isSending = false;
 
-  // エリア×LV有効マトリクス
-  // NBA選手データ（LIFF表示用）
+  let currentTab = 'record';
+  let currentTrophyFilter = 'all';
+  let trophyDataCache = null;
+
+  let currentMode = 'normal';
+
+  let drillItems = [];
+  let drillShotsMode = 'all';
+  let drillPracticeMode = 'count';
+  let drillInputTiming = 'during';
+  let drillCurrentItem = 0;
+  let drillTimerId = null;
+  let drillPhase = 'shoot';
+  let drillAddingItem = false;
+  let drillSending = false;
+  let drillState = 'builder';
+
+  let pairResults = [];
+  let pairSending = false;
+
+  const DRILL_STATES = {
+    BUILDER: 'builder',
+    SETTINGS: 'settings',
+    RUNNING: 'running',
+    INPUT: 'input',
+    SENDING: 'sending',
+    COMPLETE: 'complete'
+  };
+
   const NBA_HEROES_LITE = {
     LV1: { name: 'ヤニス', rate: 72, emoji: '🦌' },
     LV2: { name: 'ヒーロー', rate: 54, emoji: '🔥' },
@@ -1885,7 +1831,6 @@
     LV6: { name: 'カリー', rate: 93, emoji: '👨‍🍳' }
   };
 
-  // エリア×LV有効マトリクス
   const VALID_AREA_LV = {
     A1:['LV5'], A2:['LV5'], A3:['LV5'], A4:['LV5'], A5:['LV5'],
     B1:['LV4','LV5'], B2:['LV3','LV4','LV5'], B3:['LV3','LV4','LV5'], B4:['LV3','LV4','LV5'], B5:['LV4','LV5'],
@@ -1893,163 +1838,84 @@
     D1:['LV3','LV4'], D2:['LV1','LV2','LV3'], D3:['LV1','LV2','LV3'], D4:['LV1','LV2','LV3'], D5:['LV3','LV4']
   };
 
-  const rows = ['A','B','C','D'];
-  const cols = [1,2,3,4,5];
-  const grid = document.getElementById('courtGrid');
+  const lvNamesMap = {
+    LV1: 'リム',
+    LV2: 'フローター',
+    LV3: 'ミドル',
+    LV4: '3P',
+    LV5: 'Deep3P',
+    LV6: 'FT'
+  };
 
-  rows.forEach(row => {
-    cols.forEach(col => {
-      const cell = document.createElement('div');
-      cell.className = 'grid-cell';
-      cell.dataset.area = row + col;
-      cell.textContent = row + col;
-      cell.onclick = () => selectArea(cell);
-      grid.appendChild(cell);
-    });
+  const TROPHY_DEFS = {
+    FIRST_SHOT: { name:'初シュート記録', emoji:'🎯', cat:'special' },
+    TOTAL_100: { name:'100本達成', emoji:'💯', cat:'total' },
+    TOTAL_1000: { name:'1,000本達成', emoji:'🔥', cat:'total' },
+    TOTAL_10000: { name:'10,000本達成', emoji:'⭐', cat:'total' },
+    TOTAL_100000: { name:'100,000本達成', emoji:'🌟', cat:'total' },
+    TOTAL_1000000: { name:'1,000,000本', emoji:'👑', cat:'total' },
+    TOTAL_10000000: { name:'10,000,000本', emoji:'🏆', cat:'total' },
+    TOTAL_100000000: { name:'GOAT', emoji:'👑', cat:'total' },
+    ALL_AREA_100: { name:'全エリア各100本', emoji:'🗺️', cat:'total' },
+    ALL_AREA_500: { name:'全エリア各500本', emoji:'📍', cat:'total' },
+    ALL_AREA_1000: { name:'全エリア各1,000本', emoji:'🏟️', cat:'total' },
+    ALL_AREA_5000: { name:'全エリア各5,000本', emoji:'🎖️', cat:'total' },
+    ALL_AREA_10000: { name:'全エリア各10,000本', emoji:'🏅', cat:'total' },
+    ALL_AREA_1000000: { name:'COURT MASTER', emoji:'🌐', cat:'total' },
+    AREA_HUNTER: { name:'エリアハンター', emoji:'🎯', cat:'special' },
+    EARLY_BIRD: { name:'アーリーバード', emoji:'🌅', cat:'special' },
+    NIGHT_OWL: { name:'ナイトオウル', emoji:'🦉', cat:'special' },
+    SPEED_RUN: { name:'スピードラン', emoji:'⚡', cat:'special' },
+    ALL_LV_DAY: { name:'オールレベル', emoji:'🌈', cat:'special' },
+    FULL_COURT: { name:'フルコート', emoji:'🏀', cat:'special' },
+    COMEBACK: { name:'カムバック', emoji:'💪', cat:'special' }
+  };
+
+  ['3M','6M','9M','12M','15M','18M','21M','24M','27M','30M','33M','36M'].forEach(m => {
+    TROPHY_DEFS['CONTINUE_' + m] = { name:'継続' + m.replace('M','ヶ月'), emoji:'📅', cat:'streak' };
   });
 
-  function resetShotSelection() {
-    selectedShot = null;
-    document.querySelectorAll('.shot-btn').forEach(btn => btn.classList.remove('selected'));
-    document.getElementById('btnNext2').disabled = true;
-  }
+  [7,14,21,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,260,270,280,290,300,310,320,330,340,350,365].forEach(d => {
+    TROPHY_DEFS['STREAK_' + d] = { name:d + '日連続', emoji:d === 365 ? '🐍' : (d >= 100 ? '💯' : '🔥'), cat:'streak' };
+  });
 
-  function selectArea(cell) {
-    const nextArea = cell.dataset.area;
-    const areaChanged = selectedArea !== nextArea;
+  [2000,3000,4000,5000,6000,7000,8000,9000,10000].forEach(n => {
+    TROPHY_DEFS['WEEK_' + n] = { name:'週間' + n.toLocaleString() + '本', emoji:'📊', cat:'total' };
+  });
 
-    document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected'));
-    cell.classList.add('selected');
-    selectedArea = nextArea;
-    document.getElementById('btnNext1').disabled = false;
-
-    if (areaChanged) {
-      resetShotSelection();
+  ['SESSION','WEEK','MONTH'].forEach(p => {
+    const pName = p === 'SESSION' ? '1S' : p === 'WEEK' ? '週' : '月';
+    for (let lv = 1; lv <= 6; lv++) {
+      [50,60,70,80,90,100].forEach(r => {
+        TROPHY_DEFS[p + '_LV' + lv + '_' + r] = {
+          name: pName + ' LV' + lv + ' ' + r + '%',
+          emoji: r === 100 ? '🏆' : (r >= 80 ? '⭐' : '📈'),
+          cat: 'rate'
+        };
+      });
     }
-  }
+  });
 
-  function selectShot(btn) {
-    if (btn.classList.contains('disabled')) return;
-    document.querySelectorAll('.shot-btn').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-    selectedShot = btn.dataset.type;
-    document.getElementById('btnNext2').disabled = false;
-  }
-
-  function validateNumbers() {
-    const attemptsEl = document.getElementById('attemptsInput');
-    const madeEl = document.getElementById('madeInput');
-    const errorEl = document.getElementById('madeError');
-    const btnNext = document.getElementById('btnNext3');
-    let attempts = parseInt(attemptsEl.value) || 0;
-    let made = parseInt(madeEl.value) || 0;
-    if (attempts < 0) { attemptsEl.value = 0; attempts = 0; }
-    if (made < 0) { madeEl.value = 0; made = 0; }
-    if (made > attempts && attempts > 0) {
-      errorEl.style.display = 'block';
-      btnNext.disabled = true;
-    } else {
-      errorEl.style.display = 'none';
-      btnNext.disabled = !(attempts > 0);
-    }
-  }
-
-  function goToScreen(num) {
+  // ===== Utility =====
+  function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('screen' + num).classList.add('active');
-    for (let i = 1; i <= 4; i++) {
-      const dot = document.getElementById('dot' + i);
-      dot.classList.remove('active','done');
-      if (i < num) dot.classList.add('done');
-      if (i === num) dot.classList.add('active');
-    }
-    for (let i = 1; i <= 3; i++) {
-      document.getElementById('line' + i).classList.toggle('done', i < num);
-    }
-    const labels = currentMode === 'pair' ? {
-      1: 'STEP 1 ─ エリアを選択',
-      2: 'STEP 2 ─ シュート種類を選択'
-    } : {
-      1: 'STEP 1 ─ エリアを選択',
-      2: 'STEP 2 ─ シュート種類を選択',
-      3: 'STEP 3 ─ 本数を入力',
-      4: 'STEP 4 ─ メモ（任意）'
-    };
-    document.getElementById('stepLabel').textContent = labels[num] || '';
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  }
 
-    // ドリルモード用ラベル上書き
-    if (typeof drillAddingItem !== 'undefined' && drillAddingItem) {
-      if (num === 1) {
-        document.getElementById('stepLabel').textContent = 'ドリル ─ エリアを選択（' + ((typeof drillItems !== 'undefined' ? drillItems.length : 0) + 1) + '種目目）';
-      }
-      if (num === 2) {
-        document.getElementById('stepLabel').textContent = 'ドリル ─ シュートタイプ選択';
-        // btnNext2をドリル追加ボタンに変更
-        document.getElementById('btnNext2').textContent = '追加 ✓';
-      }
+  function closeLiff() {
+    if (liffReady && typeof liff !== 'undefined' && liff.isInClient()) {
+      liff.closeWindow();
     } else {
-      // 通常モードに戻す
-      if (num === 2) {
-        document.getElementById('btnNext2').textContent = '次へ →';
-      }
-    }
-
-    // Screen2: エリアに応じてLVをフィルタ
-    if (num === 2 && selectedArea) {
-      const validLVs = VALID_AREA_LV[selectedArea] || [];
-      document.querySelectorAll('.shot-btn').forEach(btn => {
-        const lv = btn.dataset.type;
-        if (validLVs.indexOf(lv) >= 0) {
-          btn.classList.remove('disabled');
-        } else {
-          btn.classList.add('disabled');
-          btn.classList.remove('selected');
-        }
-      });
-      if (selectedShot && validLVs.indexOf(selectedShot) < 0) {
-        selectedShot = null;
-        document.getElementById('btnNext2').disabled = true;
-      }
-    }
-
-    if (num === 3) {
-      document.getElementById('summaryArea').textContent = selectedArea;
-      document.getElementById('summaryShot').textContent = selectedShot;
-    }
-    if (num === 4) {
-      const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
-      const made = parseInt(document.getElementById('madeInput').value) || 0;
-      document.getElementById('memoArea').textContent = selectedArea;
-      document.getElementById('memoShot').textContent = selectedShot;
-      document.getElementById('memoResult').textContent = made + ' / ' + attempts;
+      window.close();
     }
   }
 
-  function handleScreen2Next() {
-    if (!selectedArea || !selectedShot) return;
-
-    if (typeof drillAddingItem !== 'undefined' && drillAddingItem) {
-      drillItems.push({
-        area: selectedArea,
-        lv: selectedShot,
-        lvName: lvNamesMap[selectedShot] || selectedShot,
-        attempts: null,
-        made: null
-      });
-      drillAddingItem = false;
-      document.getElementById('drillBackFromCourt').style.display = 'none';
-      document.getElementById('btnNext2').textContent = '次へ →';
-      drillGoStep(1);
-      return;
+  function safeRemoveScript(script) {
+    if (script && script.parentNode) {
+      script.parentNode.removeChild(script);
     }
-    if (currentMode === 'pair') {
-      pairGoToRecord();
-      return;
-    }
-    goToScreen(3);
   }
-
-  let isSending = false;
 
   function getModePayloadValue(mode) {
     if (mode === 'drill') return 'drill';
@@ -2084,80 +1950,41 @@
     });
   }
 
-  function submitLog() {
-  if (isSending) return;
-
-  const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
-  const made = parseInt(document.getElementById('madeInput').value) || 0;
-  const memo = document.getElementById('memoText').value.trim();
-
-  if (attempts === 0) {
-    alert('試投数を入力してください');
-    return;
-  }
-  if (made > attempts) {
-    alert('成功数が試投数を超えています');
-    return;
+  function sanitizeDigits(value) {
+    return String(value == null ? '' : value).replace(/\D+/g, '');
   }
 
-  const rate = Math.round((made / attempts) * 100);
-
-  isSending = true;
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screenSending').classList.add('active');
-  document.getElementById('stepLabel').textContent = '';
-
-  postShotLog({
-    mode: 'normal',
-    area: selectedArea,
-    shotType: selectedShot,
-    attempts: attempts,
-    made: made,
-    memo: memo
-  })
-    .then(res => {
-      if (!res.ok) {
-        throw new Error('HTTP ' + res.status);
-      }
-      return res.json();
-    })
-    .then(data => {
-      isSending = false;
-      if (data && data.status === 'ok') {
-        showSuccess(rate);
-      } else {
-        alert((data && data.message) || '保存に失敗しました');
-        goToScreen(4);
-      }
-    })
-    .catch(err => {
-      console.error('POST error:', err);
-      isSending = false;
-      alert('通信エラーが発生しました。もう一度お試しください。');
-      goToScreen(4);
-    });
-}
-
-  function showSuccess(rate) {
-    const attempts = parseInt(document.getElementById('attemptsInput').value) || 0;
-    const made = parseInt(document.getElementById('madeInput').value) || 0;
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('screen5').classList.add('active');
-    document.getElementById('stepLabel').textContent = '';
-    document.querySelectorAll('.step-dot').forEach(d => { d.classList.remove('active'); d.classList.add('done'); });
-    document.querySelectorAll('.step-line').forEach(l => l.classList.add('done'));
-    document.getElementById('successRate').textContent = rate + '%';
-    document.getElementById('successDetail').innerHTML =
-      '<strong>' + selectedArea + '</strong> エリア ─ <strong>' + selectedShot + '</strong><br>' +
-      '<strong>' + made + '</strong> / <strong>' + attempts + '</strong>';
+  function attachNumericOnlyBehavior(input) {
+    if (!input || input.dataset.numericBound === '1') return;
+    const handler = function() {
+      const digits = sanitizeDigits(this.value);
+      if (this.value !== digits) this.value = digits;
+    };
+    input.addEventListener('input', handler);
+    input.addEventListener('change', handler);
+    input.dataset.numericBound = '1';
   }
 
-  // ===== Auto-fit font size =====
+  function bindDrillNumericInputs(root) {
+    (root || document)
+      .querySelectorAll('#drillScreen2 input[type="tel"], #drillScreen3 input[type="tel"], #drillScreen4 input[type="tel"], #drillScreen4 input[type="number"]')
+      .forEach(attachNumericOnlyBehavior);
+  }
+
+  function readPositiveInt(inputId, minValue) {
+    const el = document.getElementById(inputId);
+    if (!el) return null;
+    el.value = sanitizeDigits(el.value);
+    const value = parseInt(el.value, 10);
+    if (Number.isNaN(value) || value < (minValue || 0)) return null;
+    return value;
+  }
+
   function autoFitFontSize(element, maxSize, minSize) {
     if (!element) return;
-    var text = element.textContent;
-    var len = text.length;
-    var size = maxSize;
+    const text = element.textContent || '';
+    const len = text.length;
+    let size = maxSize;
     if (len > 8) size = minSize;
     else if (len > 6) size = Math.round(maxSize * 0.65);
     else if (len > 4) size = Math.round(maxSize * 0.8);
@@ -2165,16 +1992,356 @@
   }
 
   function fitAllNumbers() {
-    // Trophy stats
     autoFitFontSize(document.getElementById('trophyTotalMakes'), 34, 18);
     autoFitFontSize(document.getElementById('trophyStreak'), 34, 18);
     autoFitFontSize(document.getElementById('trophyUnlocked'), 34, 18);
-    // Weekly
     autoFitFontSize(document.getElementById('weeklyAttempts'), 20, 13);
-    // Report cards
-    document.querySelectorAll('.report-card-num').forEach(function(el) {
-      autoFitFontSize(el, 30, 18);
+    document.querySelectorAll('.report-card-num').forEach(el => autoFitFontSize(el, 30, 18));
+  }
+
+  // ===== LIFF init =====
+  function bootLiff() {
+    if (typeof liff === 'undefined') {
+      showScreen('screen1');
+      document.getElementById('bottomNav').style.display = 'flex';
+      document.getElementById('modeToggle').style.display = 'flex';
+      return;
+    }
+
+    liff.init({ liffId: LIFF_ID })
+      .then(() => {
+        liffReady = true;
+
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        return liff.getProfile()
+          .then(profile => {
+            liffUserId = profile.userId;
+            checkUserStatus(profile.userId);
+          })
+          .catch(err => {
+            console.log('getProfile error:', err);
+            showScreen('screen1');
+            document.getElementById('bottomNav').style.display = 'flex';
+            document.getElementById('modeToggle').style.display = 'flex';
+          });
+      })
+      .catch(err => {
+        console.log('LIFF init error:', err);
+        showScreen('screen1');
+        document.getElementById('bottomNav').style.display = 'flex';
+        document.getElementById('modeToggle').style.display = 'flex';
+      });
+  }
+
+  function checkUserStatus(userId) {
+    const callbackName = 'userCheck_' + Date.now();
+    const script = document.createElement('script');
+    let finished = false;
+
+    const finalizeActive = () => {
+      showScreen('screen1');
+      document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
+      document.querySelector('.steps').style.display = 'flex';
+      document.getElementById('bottomNav').style.display = 'flex';
+      document.getElementById('modeToggle').style.display = 'flex';
+    };
+
+    const finalizeRegister = () => {
+      showScreen('screenRegister');
+      document.getElementById('stepLabel').textContent = '';
+      document.querySelector('.steps').style.display = 'none';
+      document.getElementById('bottomNav').style.display = 'none';
+      document.getElementById('modeToggle').style.display = 'none';
+    };
+
+    const cleanup = () => {
+      finished = true;
+      delete window[callbackName];
+      safeRemoveScript(script);
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (finished) return;
+      cleanup();
+      finalizeActive();
+    }, 8000);
+
+    window[callbackName] = function(data) {
+      if (finished) return;
+      clearTimeout(timeoutId);
+      cleanup();
+
+      if (data && data.status === 'active') {
+        finalizeActive();
+      } else {
+        finalizeRegister();
+      }
+    };
+
+    script.src = GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId) + '&callback=' + callbackName;
+    script.onerror = function() {
+      if (finished) return;
+      clearTimeout(timeoutId);
+      cleanup();
+      finalizeActive();
+    };
+
+    document.body.appendChild(script);
+  }
+
+  // ===== Court init =====
+  function initCourtGrid() {
+    const rows = ['A','B','C','D'];
+    const cols = [1,2,3,4,5];
+    const grid = document.getElementById('courtGrid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+
+    rows.forEach(row => {
+      cols.forEach(col => {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        cell.dataset.area = row + col;
+        cell.textContent = row + col;
+        cell.onclick = () => selectArea(cell);
+        grid.appendChild(cell);
+      });
     });
+  }
+
+  function resetShotSelection() {
+    selectedShot = null;
+    document.querySelectorAll('.shot-btn').forEach(btn => btn.classList.remove('selected'));
+    document.getElementById('btnNext2').disabled = true;
+  }
+
+  function selectArea(cell) {
+    const nextArea = cell.dataset.area;
+    const areaChanged = selectedArea !== nextArea;
+
+    document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected'));
+    cell.classList.add('selected');
+    selectedArea = nextArea;
+    document.getElementById('btnNext1').disabled = false;
+
+    if (areaChanged) resetShotSelection();
+  }
+
+  function selectShot(btn) {
+    if (btn.classList.contains('disabled')) return;
+    document.querySelectorAll('.shot-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedShot = btn.dataset.type;
+    document.getElementById('btnNext2').disabled = false;
+  }
+
+  function validateNumbers() {
+    const attemptsEl = document.getElementById('attemptsInput');
+    const madeEl = document.getElementById('madeInput');
+    const errorEl = document.getElementById('madeError');
+    const btnNext = document.getElementById('btnNext3');
+
+    let attempts = parseInt(attemptsEl.value, 10) || 0;
+    let made = parseInt(madeEl.value, 10) || 0;
+
+    if (attempts < 0) {
+      attemptsEl.value = 0;
+      attempts = 0;
+    }
+    if (made < 0) {
+      madeEl.value = 0;
+      made = 0;
+    }
+
+    if (made > attempts && attempts > 0) {
+      errorEl.style.display = 'block';
+      btnNext.disabled = true;
+    } else {
+      errorEl.style.display = 'none';
+      btnNext.disabled = !(attempts > 0);
+    }
+  }
+
+  function goToScreen(num) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+
+    const target = document.getElementById('screen' + num);
+    if (target) target.classList.add('active');
+
+    for (let i = 1; i <= 4; i++) {
+      const dot = document.getElementById('dot' + i);
+      if (!dot) continue;
+      dot.classList.remove('active', 'done');
+      if (i < num) dot.classList.add('done');
+      if (i === num) dot.classList.add('active');
+    }
+
+    for (let i = 1; i <= 3; i++) {
+      const line = document.getElementById('line' + i);
+      if (line) line.classList.toggle('done', i < num);
+    }
+
+    const labels = currentMode === 'pair'
+      ? {
+          1: 'STEP 1 ─ エリアを選択',
+          2: 'STEP 2 ─ シュート種類を選択'
+        }
+      : {
+          1: 'STEP 1 ─ エリアを選択',
+          2: 'STEP 2 ─ シュート種類を選択',
+          3: 'STEP 3 ─ 本数を入力',
+          4: 'STEP 4 ─ メモ（任意）'
+        };
+
+    document.getElementById('stepLabel').textContent = labels[num] || '';
+
+    if (drillAddingItem) {
+      if (num === 1) {
+        document.getElementById('stepLabel').textContent = 'ドリル ─ エリアを選択（' + (drillItems.length + 1) + '種目目）';
+      }
+      if (num === 2) {
+        document.getElementById('stepLabel').textContent = 'ドリル ─ シュートタイプ選択';
+        document.getElementById('btnNext2').textContent = '追加 ✓';
+      }
+    } else if (num === 2) {
+      document.getElementById('btnNext2').textContent = '次へ →';
+    }
+
+    if (num === 2 && selectedArea) {
+      const validLVs = VALID_AREA_LV[selectedArea] || [];
+      document.querySelectorAll('.shot-btn').forEach(btn => {
+        const lv = btn.dataset.type;
+        if (validLVs.includes(lv)) {
+          btn.classList.remove('disabled');
+        } else {
+          btn.classList.add('disabled');
+          btn.classList.remove('selected');
+        }
+      });
+
+      if (selectedShot && !validLVs.includes(selectedShot)) {
+        selectedShot = null;
+        document.getElementById('btnNext2').disabled = true;
+      }
+    }
+
+    if (num === 3) {
+      document.getElementById('summaryArea').textContent = selectedArea || '-';
+      document.getElementById('summaryShot').textContent = selectedShot || '-';
+    }
+
+    if (num === 4) {
+      const attempts = parseInt(document.getElementById('attemptsInput').value, 10) || 0;
+      const made = parseInt(document.getElementById('madeInput').value, 10) || 0;
+      document.getElementById('memoArea').textContent = selectedArea || '-';
+      document.getElementById('memoShot').textContent = selectedShot || '-';
+      document.getElementById('memoResult').textContent = made + ' / ' + attempts;
+    }
+  }
+
+  function handleScreen2Next() {
+    if (!selectedArea || !selectedShot) return;
+
+    if (drillAddingItem) {
+      drillItems.push({
+        area: selectedArea,
+        lv: selectedShot,
+        lvName: lvNamesMap[selectedShot] || selectedShot,
+        attempts: null,
+        made: null
+      });
+      drillAddingItem = false;
+      document.getElementById('drillBackFromCourt').style.display = 'none';
+      document.getElementById('btnNext2').textContent = '次へ →';
+      drillGoStep(1);
+      return;
+    }
+
+    if (currentMode === 'pair') {
+      pairGoToRecord();
+      return;
+    }
+
+    goToScreen(3);
+  }
+
+  function showSuccess(rate) {
+    const attempts = parseInt(document.getElementById('attemptsInput').value, 10) || 0;
+    const made = parseInt(document.getElementById('madeInput').value, 10) || 0;
+
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen5').classList.add('active');
+    document.getElementById('stepLabel').textContent = '';
+
+    document.querySelectorAll('.step-dot').forEach(d => {
+      d.classList.remove('active');
+      d.classList.add('done');
+    });
+    document.querySelectorAll('.step-line').forEach(l => l.classList.add('done'));
+
+    document.getElementById('successRate').textContent = rate + '%';
+    document.getElementById('successDetail').innerHTML =
+      '<strong>' + selectedArea + '</strong> エリア ─ <strong>' + selectedShot + '</strong><br>' +
+      '<strong>' + made + '</strong> / <strong>' + attempts + '</strong>';
+  }
+
+  function submitLog() {
+    if (isSending) return;
+
+    const attempts = parseInt(document.getElementById('attemptsInput').value, 10) || 0;
+    const made = parseInt(document.getElementById('madeInput').value, 10) || 0;
+    const memo = document.getElementById('memoText').value.trim();
+
+    if (attempts === 0) {
+      alert('試投数を入力してください');
+      return;
+    }
+
+    if (made > attempts) {
+      alert('成功数が試投数を超えています');
+      return;
+    }
+
+    const rate = Math.round((made / attempts) * 100);
+
+    isSending = true;
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screenSending').classList.add('active');
+    document.getElementById('stepLabel').textContent = '';
+
+    postShotLog({
+      mode: 'normal',
+      area: selectedArea,
+      shotType: selectedShot,
+      attempts: attempts,
+      made: made,
+      memo: memo
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+        isSending = false;
+        if (data && data.status === 'ok') {
+          showSuccess(rate);
+        } else {
+          alert((data && data.message) || '保存に失敗しました');
+          goToScreen(4);
+        }
+      })
+      .catch(err => {
+        console.error('POST error:', err);
+        isSending = false;
+        alert('通信エラーが発生しました。もう一度お試しください。');
+        goToScreen(4);
+      });
   }
 
   function resetAll() {
@@ -2192,61 +2359,7 @@
     goToScreen(1);
   }
 
-  // ===== Trophy Definitions (mirror of GAS) =====
-  const TROPHY_DEFS = {
-    FIRST_SHOT: { name:'初シュート記録', emoji:'🎯', cat:'special' },
-    TOTAL_100: { name:'100本達成', emoji:'💯', cat:'total' },
-    TOTAL_1000: { name:'1,000本達成', emoji:'🔥', cat:'total' },
-    TOTAL_10000: { name:'10,000本達成', emoji:'⭐', cat:'total' },
-    TOTAL_100000: { name:'100,000本達成', emoji:'🌟', cat:'total' },
-    TOTAL_1000000: { name:'1,000,000本', emoji:'👑', cat:'total' },
-    TOTAL_10000000: { name:'10,000,000本', emoji:'🏆', cat:'total' },
-    TOTAL_100000000: { name:'GOAT', emoji:'👑', cat:'total' },
-    ALL_AREA_100: { name:'全エリア各100本', emoji:'🗺️', cat:'total' },
-    ALL_AREA_500: { name:'全エリア各500本', emoji:'📍', cat:'total' },
-    ALL_AREA_1000: { name:'全エリア各1,000本', emoji:'🏟️', cat:'total' },
-    ALL_AREA_5000: { name:'全エリア各5,000本', emoji:'🎖️', cat:'total' },
-    ALL_AREA_10000: { name:'全エリア各10,000本', emoji:'🏅', cat:'total' },
-    ALL_AREA_1000000: { name:'COURT MASTER', emoji:'🌐', cat:'total' },
-    AREA_HUNTER: { name:'エリアハンター', emoji:'🎯', cat:'special' },
-    EARLY_BIRD: { name:'アーリーバード', emoji:'🌅', cat:'special' },
-    NIGHT_OWL: { name:'ナイトオウル', emoji:'🦉', cat:'special' },
-    SPEED_RUN: { name:'スピードラン', emoji:'⚡', cat:'special' },
-    ALL_LV_DAY: { name:'オールレベル', emoji:'🌈', cat:'special' },
-    FULL_COURT: { name:'フルコート', emoji:'🏀', cat:'special' },
-    COMEBACK: { name:'カムバック', emoji:'💪', cat:'special' }
-  };
-  // 継続系
-  ['3M','6M','9M','12M','15M','18M','21M','24M','27M','30M','33M','36M'].forEach(m => {
-    TROPHY_DEFS['CONTINUE_'+m] = { name:'継続'+m.replace('M','ヶ月'), emoji:'📅', cat:'streak' };
-  });
-  // 連続系
-  [7,14,21,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,260,270,280,290,300,310,320,330,340,350,365].forEach(d => {
-    TROPHY_DEFS['STREAK_'+d] = { name: d+'日連続', emoji: d===365?'🐍':(d>=100?'💯':'🔥'), cat:'streak' };
-  });
-  // 週間系
-  [2000,3000,4000,5000,6000,7000,8000,9000,10000].forEach(n => {
-    TROPHY_DEFS['WEEK_'+n] = { name:'週間'+n.toLocaleString()+'本', emoji:'📊', cat:'total' };
-  });
-  // 成功率系（セッション/週間/月間 × LV1-6 × 50-100%）
-  ['SESSION','WEEK','MONTH'].forEach(p => {
-    const pName = p==='SESSION'?'1S':p==='WEEK'?'週':' 月';
-    for(let lv=1;lv<=6;lv++){
-      [50,60,70,80,90,100].forEach(r => {
-        TROPHY_DEFS[p+'_LV'+lv+'_'+r] = {
-          name: pName+' LV'+lv+' '+r+'%',
-          emoji: r===100?'🏆':(r>=80?'⭐':'📈'),
-          cat: 'rate'
-        };
-      });
-    }
-  });
-
-  // ===== Tab Switching =====
-  let currentTab = 'record';
-  let trophyDataCache = null;
-  let currentTrophyFilter = 'all';
-
+  // ===== Tab =====
   function switchTab(tab) {
     currentTab = tab;
     document.getElementById('navRecord').classList.toggle('active', tab === 'record');
@@ -2257,19 +2370,17 @@
     const stepLabel = document.getElementById('stepLabel');
     const modeToggle = document.getElementById('modeToggle');
 
-    // 全画面非表示
     document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
 
     if (tab === 'record') {
       document.getElementById('trophyPage').classList.remove('active');
       document.getElementById('reportPage').classList.remove('active');
       modeToggle.style.display = 'flex';
+
       if (currentMode === 'normal') {
         stepsEl.style.display = 'flex';
         stepLabel.style.display = 'block';
-        if (!document.querySelector('.screen.active')) {
-          goToScreen(1);
-        }
+        goToScreen(1);
       } else if (currentMode === 'drill') {
         stepsEl.style.display = 'none';
         stepLabel.style.display = 'none';
@@ -2277,9 +2388,7 @@
       } else {
         stepsEl.style.display = 'flex';
         stepLabel.style.display = 'block';
-        if (!document.querySelector('.screen.active')) {
-          goToScreen(1);
-        }
+        goToScreen(1);
       }
     } else if (tab === 'trophy') {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -2300,25 +2409,30 @@
     }
   }
 
+  // ===== Trophy =====
   function loadTrophies() {
     if (!liffUserId) return;
     document.getElementById('trophyList').innerHTML = '<div class="trophy-loading">読み込み中...</div>';
 
     const callbackName = 'trophyCb_' + Date.now();
+    const script = document.createElement('script');
+
     window[callbackName] = function(data) {
       delete window[callbackName];
-      document.body.removeChild(script);
-      if (data.status === 'ok') {
+      safeRemoveScript(script);
+      if (data && data.status === 'ok') {
         trophyDataCache = data;
         renderTrophyStats(data);
         renderTrophies(data.trophies, currentTrophyFilter);
+      } else {
+        document.getElementById('trophyList').innerHTML = '<div class="trophy-loading">読み込みに失敗しました</div>';
       }
     };
-    const script = document.createElement('script');
+
     script.src = GAS_URL + '?action=getTrophies&userId=' + encodeURIComponent(liffUserId) + '&callback=' + callbackName;
     script.onerror = function() {
       delete window[callbackName];
-      document.body.removeChild(script);
+      safeRemoveScript(script);
       document.getElementById('trophyList').innerHTML = '<div class="trophy-loading">読み込みに失敗しました</div>';
     };
     document.body.appendChild(script);
@@ -2329,7 +2443,6 @@
     document.getElementById('trophyStreak').textContent = data.streak || 0;
     document.getElementById('trophyUnlocked').textContent = (data.trophies || []).length;
 
-    // Weekly Progress
     if (data.weekly) {
       const w = data.weekly;
       const pct = Math.min(100, Math.round((w.attempts / w.goal) * 100));
@@ -2344,43 +2457,46 @@
       }
 
       const remaining = Math.max(0, w.goal - w.attempts);
-      if (remaining > 0) {
-        document.getElementById('weeklyRemaining').innerHTML = 'あと <strong>' + remaining.toLocaleString() + '</strong> 本';
-      } else {
-        document.getElementById('weeklyRemaining').innerHTML = '🎉 <strong>目標達成！</strong>';
-      }
+      document.getElementById('weeklyRemaining').innerHTML =
+        remaining > 0
+          ? 'あと <strong>' + remaining.toLocaleString() + '</strong> 本'
+          : '🎉 <strong>目標達成！</strong>';
 
-      // LV Breakdown
-      const lvNames = { LV1:'リム', LV2:'フローター', LV3:'ミドル', LV4:'3P', LV5:'Deep3P', LV6:'FT' };
       const lvOrder = ['LV1','LV2','LV3','LV4','LV5','LV6'];
       let lvHtml = '';
+
       lvOrder.forEach(lv => {
         const d = (w.lvBreakdown && w.lvBreakdown[lv]) ? w.lvBreakdown[lv] : null;
-        if (d && d.attempts > 0) {
-          const rate = Math.round((d.makes / d.attempts) * 100);
-          const prevD = (w.prevLvBreakdown && w.prevLvBreakdown[lv]) ? w.prevLvBreakdown[lv] : null;
-          let growthHtml = '';
-          if (prevD && prevD.attempts > 0) {
-            const prevRate = Math.round((prevD.makes / prevD.attempts) * 100);
-            const diff = rate - prevRate;
-            if (diff > 0) {
-              growthHtml = '<div class="lv-chip-rate" style="color:#5CB85C;font-weight:700;">📈 +' + diff + '%</div>';
-            } else if (diff < 0) {
-              growthHtml = '<div class="lv-chip-rate" style="color:var(--text-dim);">' + diff + '%</div>';
-            } else {
-              growthHtml = '<div class="lv-chip-rate" style="color:var(--text-dim);">±0%</div>';
-            }
+        if (!d || d.attempts <= 0) return;
+
+        const rate = Math.round((d.makes / d.attempts) * 100);
+        const prevD = (w.prevLvBreakdown && w.prevLvBreakdown[lv]) ? w.prevLvBreakdown[lv] : null;
+        let growthHtml = '';
+
+        if (prevD && prevD.attempts > 0) {
+          const prevRate = Math.round((prevD.makes / prevD.attempts) * 100);
+          const diff = rate - prevRate;
+          if (diff > 0) {
+            growthHtml = '<div class="lv-chip-rate" style="color:#5CB85C;font-weight:700;">📈 +' + diff + '%</div>';
+          } else if (diff < 0) {
+            growthHtml = '<div class="lv-chip-rate" style="color:var(--text-dim);">' + diff + '%</div>';
+          } else {
+            growthHtml = '<div class="lv-chip-rate" style="color:var(--text-dim);">±0%</div>';
           }
-          lvHtml += '<div class="lv-chip">';
-          lvHtml += '<div class="lv-chip-name">' + lv + '</div>';
-          lvHtml += '<div class="lv-chip-num">' + d.attempts + '</div>';
-          lvHtml += '<div class="lv-chip-rate">' + rate + '%（' + d.makes + '/' + d.attempts + '）</div>';
-          lvHtml += growthHtml;
-          lvHtml += '</div>';
         }
+
+        lvHtml += '<div class="lv-chip">';
+        lvHtml += '<div class="lv-chip-name">' + lv + '</div>';
+        lvHtml += '<div class="lv-chip-num">' + d.attempts + '</div>';
+        lvHtml += '<div class="lv-chip-rate">' + rate + '%（' + d.makes + '/' + d.attempts + '）</div>';
+        lvHtml += growthHtml;
+        lvHtml += '</div>';
       });
-      document.getElementById('lvBreakdown').innerHTML = lvHtml || '<div style="grid-column:1/-1; text-align:center; color:var(--text-dim); font-size:12px;">今週の記録はまだありません</div>';
+
+      document.getElementById('lvBreakdown').innerHTML =
+        lvHtml || '<div style="grid-column:1/-1; text-align:center; color:var(--text-dim); font-size:12px;">今週の記録はまだありません</div>';
     }
+
     fitAllNumbers();
   }
 
@@ -2389,34 +2505,28 @@
     document.querySelectorAll('.trophy-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.cat === cat);
     });
-    if (trophyDataCache) {
-      renderTrophies(trophyDataCache.trophies, cat);
-    }
+    if (trophyDataCache) renderTrophies(trophyDataCache.trophies, cat);
   }
 
   function renderTrophies(unlockedList, category) {
     const container = document.getElementById('trophyList');
     const unlocked = new Set(unlockedList || []);
 
-    // Filter trophy defs by category
     let entries = Object.entries(TROPHY_DEFS);
     if (category !== 'all') {
-      entries = entries.filter(([k, v]) => v.cat === category);
+      entries = entries.filter(([, v]) => v.cat === category);
     }
 
-    // Sort: unlocked first, then locked
     entries.sort((a, b) => {
       const aU = unlocked.has(a[0]) ? 0 : 1;
       const bU = unlocked.has(b[0]) ? 0 : 1;
       return aU - bU;
     });
 
-    // Count
     const unlockedInCat = entries.filter(([k]) => unlocked.has(k)).length;
     document.getElementById('trophyCountBadge').innerHTML =
       '<strong>' + unlockedInCat + '</strong> / ' + entries.length + ' 解放済み';
 
-    // Limit display (show unlocked + first 30 locked to avoid huge DOM)
     const unlockedEntries = entries.filter(([k]) => unlocked.has(k));
     const lockedEntries = entries.filter(([k]) => !unlocked.has(k)).slice(0, 30);
     const displayEntries = [...unlockedEntries, ...lockedEntries];
@@ -2440,6 +2550,7 @@
   // ===== Report =====
   function loadReport() {
     if (!liffUserId) return;
+
     document.getElementById('reportLoading').style.display = 'block';
     document.getElementById('reportSummary').innerHTML = '';
     document.getElementById('reportLvList').innerHTML = '';
@@ -2447,33 +2558,39 @@
     document.getElementById('reportDailyLog').innerHTML = '';
 
     const callbackName = 'reportCb_' + Date.now();
+    const script = document.createElement('script');
+
     window[callbackName] = function(data) {
       delete window[callbackName];
-      document.body.removeChild(script);
+      safeRemoveScript(script);
       document.getElementById('reportLoading').style.display = 'none';
-      if (data.status === 'ok') {
+
+      if (data && data.status === 'ok') {
         renderReport(data);
+      } else {
+        document.getElementById('reportLoading').textContent = '読み込みに失敗しました';
+        document.getElementById('reportLoading').style.display = 'block';
       }
     };
-    const script = document.createElement('script');
+
     script.src = GAS_URL + '?action=getReport&userId=' + encodeURIComponent(liffUserId) + '&callback=' + callbackName;
     script.onerror = function() {
       delete window[callbackName];
-      document.body.removeChild(script);
+      safeRemoveScript(script);
       document.getElementById('reportLoading').textContent = '読み込みに失敗しました';
+      document.getElementById('reportLoading').style.display = 'block';
     };
+
     document.body.appendChild(script);
   }
 
   function renderReport(data) {
-    // Date range
     if (data.week) {
       const s = data.week.start.split('-');
       const e = data.week.end.split('-');
       document.getElementById('reportDateRange').textContent = s[1] + '/' + s[2] + ' - ' + e[1] + '/' + e[2];
     }
 
-    // Summary cards
     const weekRate = data.weekAttempts > 0 ? Math.round((data.weekMakes / data.weekAttempts) * 100) : 0;
     const prevRate = data.prevAttempts > 0 ? Math.round((data.prevMakes / data.prevAttempts) * 100) : 0;
     const diffAttempts = data.weekAttempts - data.prevAttempts;
@@ -2490,7 +2607,6 @@
     let summaryHtml = '';
     summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + data.weekAttempts.toLocaleString() + '</div><div class="report-card-label">シュート数</div>' + diffHtml(diffAttempts, '本') + '</div>';
 
-    // 成長率カード（成功率より成長率を大きく表示）
     if (data.prevAttempts > 0 && diffRate !== 0) {
       const growthSign = diffRate > 0 ? '+' : '';
       const growthColor = diffRate > 0 ? '#5CB85C' : '#D9534F';
@@ -2503,8 +2619,6 @@
     summaryHtml += '<div class="report-summary-card"><div class="report-card-num">' + progress + '%</div><div class="report-card-label">2,000本達成率</div><div class="report-card-diff flat">' + data.weekAttempts + ' / 2,000</div></div>';
     document.getElementById('reportSummary').innerHTML = summaryHtml;
 
-    // LV Breakdown
-    const lvNames = { LV1:'リム', LV2:'フローター', LV3:'ミドル', LV4:'3P', LV5:'Deep3P', LV6:'FT' };
     const lvOrder = ['LV1','LV2','LV3','LV4','LV5','LV6'];
     let lvHtml = '';
 
@@ -2516,12 +2630,14 @@
       const prevLv = data.prevLvData[lv];
       let diffStr = '';
       let growthLine = '';
+
       if (prevLv && prevLv.attempts > 0) {
         const pRate = Math.round((prevLv.makes / prevLv.attempts) * 100);
         const diff = rate - pRate;
         const cls = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'flat');
         const sign = diff > 0 ? '+' : '';
         diffStr = '<span class="report-lv-diff report-card-diff ' + cls + '" style="font-size:16px;">' + sign + diff + '%</span>';
+
         if (diff > 0) {
           growthLine = '<br><span style="color:#5CB85C;font-size:13px;font-weight:700;">📈 先週から' + diff + '%成長！</span>';
         } else if (diff < 0) {
@@ -2529,39 +2645,38 @@
         }
       }
 
-      // Best / Growth areas
-      const areas = d.areas;
+      const areas = d.areas || {};
       const areaKeys = Object.keys(areas);
       const areaRates = areaKeys.map(a => {
         const ad = areas[a];
         return { area: a, rate: ad.attempts > 0 ? Math.round((ad.makes / ad.attempts) * 100) : 0 };
       }).sort((a, b) => b.rate - a.rate);
 
-      const best = areaRates[0];
-      const growth = areaRates[areaRates.length - 1];
-      const midIdx = Math.floor(areaRates.length / 2);
-      const median = areaRates[midIdx].rate;
+      const best = areaRates[0] || { area: '-', rate: 0 };
+      const growth = areaRates[areaRates.length - 1] || { area: '-', rate: 0 };
+      const midIdx = areaRates.length > 0 ? Math.floor(areaRates.length / 2) : 0;
+      const median = areaRates.length > 0 ? areaRates[midIdx].rate : 0;
 
       lvHtml += '<div class="report-lv-item">';
-      lvHtml += '<div class="report-lv-header"><div class="report-lv-name">' + lv + ' ' + (lvNames[lv]||'') + '</div>' + diffStr + '</div>';
+      lvHtml += '<div class="report-lv-header"><div class="report-lv-name">' + lv + ' ' + (lvNamesMap[lv] || '') + '</div>' + diffStr + '</div>';
       lvHtml += '<div class="report-lv-stats">';
       lvHtml += '最高：' + best.rate + '%（' + best.area + '）<span> / 中央値：' + median + '%</span><br>';
       lvHtml += d.attempts + '本中 ' + d.makes + '本成功（' + rate + '%）<br>';
       lvHtml += 'ベスト：' + best.area + '(' + best.rate + '%) <span>/ 伸びしろ：' + growth.area + '(' + growth.rate + '%)</span>';
       lvHtml += growthLine;
-      // NBA比較
-      if (data.nbaHeroes && data.nbaHeroes[lv]) {
-        const nba = data.nbaHeroes[lv];
-        const topPlayer = nba.players[0];
+
+      if (data.nbaHeroes && data.nbaHeroes[lv] && data.nbaHeroes[lv].players && data.nbaHeroes[lv].players[0]) {
+        const topPlayer = data.nbaHeroes[lv].players[0];
         const gap = topPlayer.rate - rate;
         lvHtml += '<br><span style="color:var(--gold);font-size:12px;">' + topPlayer.emoji + ' NBAトップ：' + topPlayer.name + ' ' + topPlayer.rate + '%（あと' + gap + '%）</span>';
       }
+
       lvHtml += '</div></div>';
     });
 
-    document.getElementById('reportLvList').innerHTML = lvHtml || '<div class="report-loading" style="padding:20px 0;">今週のLV別データはありません</div>';
+    document.getElementById('reportLvList').innerHTML =
+      lvHtml || '<div class="report-loading" style="padding:20px 0;">今週のLV別データはありません</div>';
 
-    // Area Heatmap
     const rows = ['A','B','C','D'];
     const cols = [1,2,3,4,5];
     let areaHtml = '';
@@ -2570,23 +2685,17 @@
       cols.forEach(col => {
         const area = row + col;
         const ad = data.areaData[area];
+
         if (ad && ad.attempts > 0) {
           const rate = Math.round((ad.makes / ad.attempts) * 100);
-          // 0%=赤, 25%=オレンジ, 50%=黄, 75%+=緑 のはっきりしたグラデーション
           let bg;
-          if (rate < 20) {
-            bg = 'hsla(0, 70%, 35%, 0.85)';       // 赤
-          } else if (rate < 30) {
-            bg = 'hsla(20, 70%, 38%, 0.85)';      // 赤オレンジ
-          } else if (rate < 40) {
-            bg = 'hsla(40, 70%, 40%, 0.85)';      // オレンジ
-          } else if (rate < 50) {
-            bg = 'hsla(55, 70%, 38%, 0.85)';      // 黄
-          } else if (rate < 60) {
-            bg = 'hsla(80, 60%, 35%, 0.85)';      // 黄緑
-          } else {
-            bg = 'hsla(120, 60%, 32%, 0.85)';     // 緑
-          }
+          if (rate < 20) bg = 'hsla(0, 70%, 35%, 0.85)';
+          else if (rate < 30) bg = 'hsla(20, 70%, 38%, 0.85)';
+          else if (rate < 40) bg = 'hsla(40, 70%, 40%, 0.85)';
+          else if (rate < 50) bg = 'hsla(55, 70%, 38%, 0.85)';
+          else if (rate < 60) bg = 'hsla(80, 60%, 35%, 0.85)';
+          else bg = 'hsla(120, 60%, 32%, 0.85)';
+
           areaHtml += '<div class="report-area-cell" style="background:' + bg + '">';
           areaHtml += '<div class="report-area-label">' + area + '</div>';
           areaHtml += '<div class="report-area-rate">' + rate + '%</div>';
@@ -2599,62 +2708,41 @@
         }
       });
     });
+
     document.getElementById('reportAreaGrid').innerHTML = areaHtml;
 
-    // Daily Log
     const dailyEntries = Object.entries(data.dailyData || {}).sort((a, b) => a[0].localeCompare(b[0]));
     let dailyHtml = '';
+
     dailyEntries.forEach(([date, d]) => {
       const rate = d.attempts > 0 ? Math.round((d.makes / d.attempts) * 100) : 0;
       const dateParts = date.split('-');
       const displayDate = dateParts[1] + '/' + dateParts[2];
+
       dailyHtml += '<div class="report-daily-row">';
       dailyHtml += '<div class="report-daily-date">' + displayDate + '</div>';
       dailyHtml += '<div><span class="report-daily-num">' + d.attempts + '</span> 本</div>';
       dailyHtml += '<div>' + d.makes + '/' + d.attempts + '（' + rate + '%）</div>';
       dailyHtml += '</div>';
     });
-    document.getElementById('reportDailyLog').innerHTML = dailyHtml || '<div class="report-loading" style="padding:20px 0;">今週の記録はまだありません</div>';
+
+    document.getElementById('reportDailyLog').innerHTML =
+      dailyHtml || '<div class="report-loading" style="padding:20px 0;">今週の記録はまだありません</div>';
+
     fitAllNumbers();
   }
 
-  // ===== Drill Mode =====
-  let drillItems = [];
-  let drillShotsMode = 'all';
-  let drillPracticeMode = 'count';
-  let drillInputTiming = 'during';
-  let drillCurrentItem = 0;
-  let drillTimerId = null;
-  let drillPhase = 'shoot';
-  let drillAddingItem = false;
-  let currentMode = 'normal';
-  let drillSending = false;
-  let drillState = 'builder';
-  let pairResults = [];
-  let pairSending = false;
-
-  const DRILL_STATES = {
-    BUILDER: 'builder',
-    SETTINGS: 'settings',
-    RUNNING: 'running',
-    INPUT: 'input',
-    SENDING: 'sending',
-    COMPLETE: 'complete'
-  };
-
+  // ===== Drill =====
   function drillSetState(state) {
     drillState = state;
-  }
-
-  function drillIsState(state) {
-    return drillState === state;
   }
 
   function drillShowOnlyDrillScreen(screenId) {
     drillCloseActiveScreens();
     document.querySelector('.steps').style.display = 'none';
     document.getElementById('stepLabel').style.display = 'none';
-    if (screenId) document.getElementById(screenId).classList.add('active');
+    const screen = document.getElementById(screenId);
+    if (screen) screen.classList.add('active');
   }
 
   function drillEnterBuilder() {
@@ -2696,122 +2784,38 @@
     }
   }
 
-  function sanitizeDigits(value) {
-    return String(value == null ? '' : value).replace(/\D+/g, '');
-  }
-
-  function attachNumericOnlyBehavior(input) {
-    if (!input || input.dataset.numericBound === '1') return;
-    const handler = function() {
-      const digits = sanitizeDigits(this.value);
-      if (this.value !== digits) this.value = digits;
-    };
-    input.addEventListener('input', handler);
-    input.addEventListener('change', handler);
-    input.dataset.numericBound = '1';
-  }
-
-  function bindDrillNumericInputs(root) {
-    (root || document).querySelectorAll('#drillScreen2 input[type="tel"], #drillScreen3 input[type="tel"], #drillScreen4 input[type="tel"], #drillScreen4 input[type="number"]').forEach(attachNumericOnlyBehavior);
-  }
-
-  function readPositiveInt(inputId, minValue) {
-    const el = document.getElementById(inputId);
-    if (!el) return null;
-    el.value = sanitizeDigits(el.value);
-    const value = parseInt(el.value, 10);
-    if (Number.isNaN(value) || value < (minValue || 0)) return null;
-    return value;
-  }
-
   function resetDrillExecutionState() {
     drillCurrentItem = 0;
     drillPhase = 'shoot';
     drillSending = false;
     drillClearTimer();
+
     const intervalAttempts = document.getElementById('drillIntervalAttemptsInput');
     const intervalMade = document.getElementById('drillIntervalMadeInput');
     if (intervalAttempts) intervalAttempts.value = '';
     if (intervalMade) intervalMade.value = '';
+
     document.getElementById('drillCountdown').style.display = 'none';
     document.getElementById('drillTimerDisplay').style.display = 'none';
     document.getElementById('drillIntervalInput').style.display = 'none';
     document.getElementById('drillFreeMode').style.display = 'none';
   }
 
-  const lvNamesMap = { LV1:'リム', LV2:'フローター', LV3:'ミドル', LV4:'3P', LV5:'Deep3P', LV6:'FT' };
-
-  // --- Audio: WAVデータ生成 ---
-  function generateBeepDataUri(freq, durationMs, volume) {
-    const sampleRate = 8000;
-    const numSamples = Math.floor(sampleRate * durationMs / 1000);
-    const buffer = new ArrayBuffer(44 + numSamples * 2);
-    const view = new DataView(buffer);
-    // WAV header
-    const writeStr = (off, str) => { for(let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); };
-    writeStr(0, 'RIFF');
-    view.setUint32(4, 36 + numSamples * 2, true);
-    writeStr(8, 'WAVE');
-    writeStr(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeStr(36, 'data');
-    view.setUint32(40, numSamples * 2, true);
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const val = Math.sin(2 * Math.PI * freq * t) * volume * 32767;
-      view.setInt16(44 + i * 2, val, true);
-    }
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    return 'data:audio/wav;base64,' + btoa(binary);
-  }
-
-  const beepShortUri = generateBeepDataUri(800, 150, 0.8);
-  const beepLongUri = generateBeepDataUri(1000, 400, 0.9);
-  const beepHighUri = generateBeepDataUri(1200, 200, 0.9);
-
-  function playSound(uri) {
-    try {
-      const a = new Audio(uri);
-      a.volume = 1.0;
-      a.play().catch(() => {});
-    } catch(e) {}
-  }
-  function beepCountdown() { playSound(beepShortUri); }
-  function beepGo() { playSound(beepLongUri); }
-  function beepTimerEnd() {
-    playSound(beepHighUri);
-    setTimeout(() => playSound(beepHighUri), 300);
-    setTimeout(() => playSound(beepHighUri), 600);
-  }
-
-  // ドリル開始時にオーディオをアンロック（iOS対応）
-  function unlockAudio() {
-    try {
-      const a = new Audio(generateBeepDataUri(1, 1, 0));
-      a.volume = 0;
-      a.play().then(() => a.pause()).catch(() => {});
-    } catch(e) {}
-  }
-
   function switchMode(mode) {
     currentMode = mode;
     drillAddingItem = false;
     document.getElementById('drillBackFromCourt').style.display = 'none';
+
     document.getElementById('modeNormal').classList.toggle('active', mode === 'normal');
     document.getElementById('modeDrill').classList.toggle('active', mode === 'drill');
     document.getElementById('modePair').classList.toggle('active', mode === 'pair');
+
     const stepsEl = document.querySelector('.steps');
     const stepLabel = document.getElementById('stepLabel');
+
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+
     if (mode === 'normal') {
       stepsEl.style.display = 'flex';
       stepLabel.style.display = 'block';
@@ -2846,20 +2850,20 @@
     document.getElementById('drillBackFromCourt').style.display = 'none';
     document.getElementById('btnNext2').textContent = '次へ →';
 
-    if (step === 1) {
-      drillEnterBuilder();
-    } else if (step === 2) {
-      drillEnterSettings();
-    }
+    if (step === 1) drillEnterBuilder();
+    if (step === 2) drillEnterSettings();
   }
 
-  // --- 種目追加：通常モードのscreen1/screen2を再利用 ---
   function drillAddItem() {
-    if (drillItems.length >= 5) { alert('最大5種目までです'); return; }
+    if (drillItems.length >= 5) {
+      alert('最大5種目までです');
+      return;
+    }
+
     drillAddingItem = true;
     drillSetState(DRILL_STATES.BUILDER);
-
     drillCloseActiveScreens();
+
     document.querySelector('.steps').style.display = 'flex';
     document.getElementById('stepLabel').style.display = 'block';
     document.getElementById('stepLabel').textContent = 'ドリル ─ エリアを選択（' + (drillItems.length + 1) + '種目目）';
@@ -2868,8 +2872,6 @@
     drillResetCourseSelection();
     goToScreen(1);
   }
-
-  // selectShotにドリル追加処理を追加（元の関数内で判定）
 
   function drillRemoveItem(idx) {
     drillItems.splice(idx, 1);
@@ -2880,25 +2882,26 @@
   function drillRenderItemList() {
     const list = document.getElementById('drillItemList');
     list.innerHTML = '';
+
     drillItems.forEach((item, i) => {
       const div = document.createElement('div');
       div.className = 'drill-item';
-      div.innerHTML = '<div class="drill-item-info"><span>' + (i+1) + '.</span> ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '</div><button class="drill-item-remove" onclick="drillRemoveItem(' + i + ')">✕</button>';
+      div.innerHTML =
+        '<div class="drill-item-info"><span>' + (i + 1) + '.</span> ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '</div>' +
+        '<button class="drill-item-remove" onclick="drillRemoveItem(' + i + ')">✕</button>';
       list.appendChild(div);
     });
+
     document.getElementById('drillAddBtn').style.display = drillItems.length >= 5 ? 'none' : 'block';
     document.getElementById('drillNext1').disabled = drillItems.length === 0;
   }
 
-  // --- Step 2 設定 ---
   function drillSetPracticeMode(mode) {
     drillPracticeMode = mode;
     document.getElementById('drillModeCount').classList.toggle('active', mode === 'count');
     document.getElementById('drillModeTimer').classList.toggle('active', mode === 'timer');
-    // 排他的表示＋グレーアウト
     document.getElementById('drillCountSettings').style.display = mode === 'count' ? 'block' : 'none';
     document.getElementById('drillTimerSettings').style.display = mode === 'timer' ? 'block' : 'none';
-    // 非アクティブ側をグレーアウト表示
     document.getElementById('drillModeCount').style.opacity = mode === 'count' ? '1' : '0.4';
     document.getElementById('drillModeTimer').style.opacity = mode === 'timer' ? '1' : '0.4';
   }
@@ -2915,10 +2918,19 @@
   function drillRenderEachShots() {
     const c = document.getElementById('drillShotsEachInput');
     c.innerHTML = '';
+
     drillItems.forEach((item, i) => {
       const attemptsValue = item.attempts && item.attempts > 0 ? item.attempts : 20;
-      c.innerHTML += '<div class="drill-setting-row"><div class="drill-setting-label">' + item.area + ' / ' + item.lv + '</div><div class="drill-setting-value"><input type="tel" inputmode="numeric" pattern="[0-9]*" class="drill-each-shots" data-idx="' + i + '" value="' + attemptsValue + '" min="1" style="width:70px;padding:10px;border-radius:10px;border:1px solid rgba(200,168,112,0.3);background:rgba(255,255,255,0.06);color:var(--white-pure);font-size:22px;font-weight:700;text-align:center;font-family:Bebas Neue,sans-serif;"><span>本</span></div></div>';
+      c.innerHTML +=
+        '<div class="drill-setting-row">' +
+          '<div class="drill-setting-label">' + item.area + ' / ' + item.lv + '</div>' +
+          '<div class="drill-setting-value">' +
+            '<input type="tel" inputmode="numeric" pattern="[0-9]*" class="drill-each-shots" data-idx="' + i + '" value="' + attemptsValue + '" min="1" style="width:70px;padding:10px;border-radius:10px;border:1px solid rgba(200,168,112,0.3);background:rgba(255,255,255,0.06);color:var(--white-pure);font-size:22px;font-weight:700;text-align:center;font-family:Bebas Neue,sans-serif;">' +
+            '<span>本</span>' +
+          '</div>' +
+        '</div>';
     });
+
     bindDrillNumericInputs(c);
   }
 
@@ -2933,7 +2945,70 @@
     document.getElementById('drillInputAfter').classList.toggle('active', timing === 'after');
   }
 
-  // --- Start ---
+  function generateBeepDataUri(freq, durationMs, volume) {
+    const sampleRate = 8000;
+    const numSamples = Math.floor(sampleRate * durationMs / 1000);
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+
+    const writeStr = (off, str) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+    };
+
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const val = Math.sin(2 * Math.PI * freq * t) * volume * 32767;
+      view.setInt16(44 + i * 2, val, true);
+    }
+
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return 'data:audio/wav;base64,' + btoa(binary);
+  }
+
+  const beepShortUri = generateBeepDataUri(800, 150, 0.8);
+  const beepLongUri = generateBeepDataUri(1000, 400, 0.9);
+  const beepHighUri = generateBeepDataUri(1200, 200, 0.9);
+
+  function playSound(uri) {
+    try {
+      const a = new Audio(uri);
+      a.volume = 1.0;
+      a.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  function beepCountdown() { playSound(beepShortUri); }
+  function beepGo() { playSound(beepLongUri); }
+  function beepTimerEnd() {
+    playSound(beepHighUri);
+    setTimeout(() => playSound(beepHighUri), 300);
+    setTimeout(() => playSound(beepHighUri), 600);
+  }
+
+  function unlockAudio() {
+    try {
+      const a = new Audio(generateBeepDataUri(1, 1, 0));
+      a.volume = 0;
+      a.play().then(() => a.pause()).catch(() => {});
+    } catch (e) {}
+  }
+
   function drillStart() {
     if (drillItems.length === 0) {
       alert('種目を1つ以上追加してください');
@@ -2958,7 +3033,7 @@
           el.value = sanitizeDigits(el.value);
           const idx = parseInt(el.dataset.idx, 10);
           const attempts = parseInt(el.value, 10);
-          if (isNaN(attempts) || attempts <= 0) {
+          if (Number.isNaN(attempts) || attempts <= 0) {
             alert((idx + 1) + '種目目の試投数を入力してください');
             el.focus();
             return;
@@ -2969,6 +3044,7 @@
     } else {
       const shootTime = readPositiveInt('drillShootTime', 1);
       const intervalTime = readPositiveInt('drillIntervalTime', 0);
+
       if (shootTime === null) {
         alert('シュートタイムを入力してください');
         return;
@@ -2977,6 +3053,7 @@
         alert('インターバルを入力してください');
         return;
       }
+
       document.getElementById('drillShootTime').value = String(shootTime);
       document.getElementById('drillIntervalTime').value = String(intervalTime);
       drillItems.forEach(item => { item.attempts = null; });
@@ -2993,9 +3070,10 @@
       document.getElementById('drillTimerDisplay').style.display = 'none';
       document.getElementById('drillIntervalInput').style.display = 'none';
       document.getElementById('drillFreeMode').style.display = 'block';
+
       let html = '';
       drillItems.forEach((item, i) => {
-        html += '<div class="drill-item"><div class="drill-item-info"><span>' + (i+1) + '.</span> ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '（' + item.attempts + '本）</div></div>';
+        html += '<div class="drill-item"><div class="drill-item-info"><span>' + (i + 1) + '.</span> ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '（' + item.attempts + '本）</div></div>';
       });
       document.getElementById('drillFreeList').innerHTML = html;
     }
@@ -3006,15 +3084,24 @@
     document.getElementById('drillTimerDisplay').style.display = 'none';
     document.getElementById('drillIntervalInput').style.display = 'none';
     document.getElementById('drillFreeMode').style.display = 'none';
+
     let count = 3;
     const numEl = document.getElementById('drillCountdownNum');
     numEl.textContent = count;
     beepCountdown();
+
     drillTimerId = setInterval(() => {
       count--;
-      if (count > 0) { numEl.textContent = count; beepCountdown(); }
-      else if (count === 0) { numEl.innerHTML = '<div class="drill-countdown-go">GO!</div>'; beepGo(); }
-      else { clearInterval(drillTimerId); drillRunTimer(); }
+      if (count > 0) {
+        numEl.textContent = count;
+        beepCountdown();
+      } else if (count === 0) {
+        numEl.innerHTML = '<div class="drill-countdown-go">GO!</div>';
+        beepGo();
+      } else {
+        clearInterval(drillTimerId);
+        drillRunTimer();
+      }
     }, 1000);
   }
 
@@ -3039,15 +3126,18 @@
   function drillShowIntervalInput(item, isLast) {
     document.getElementById('drillTimerDisplay').style.display = 'none';
     document.getElementById('drillIntervalInput').style.display = 'block';
+
     const attemptsRow = document.getElementById('drillIntervalAttemptsRow');
     const attemptsInput = document.getElementById('drillIntervalAttemptsInput');
+
     document.getElementById('drillIntervalItemName').textContent = item.area + ' / ' + item.lv + ' ' + item.lvName;
     document.getElementById('drillIntervalItemAttempts').textContent = item.attempts ? ('試投：' + item.attempts + '本') : '';
     attemptsRow.style.display = item.attempts === null ? 'block' : 'none';
     attemptsInput.value = item.attempts || '';
-    document.getElementById('drillIntervalMadeInput').value = item.made !== null ? item.made : '';
+    document.getElementById('drillIntervalMadeInput').value = item.made != null ? item.made : '';
     bindDrillNumericInputs(document.getElementById('drillScreen3'));
     document.getElementById('drillIntervalLabel').textContent = isLast ? '最後の種目 ─ 結果を入力' : 'インターバル中に結果を入力';
+
     if (item.attempts === null) attemptsInput.focus();
     else document.getElementById('drillIntervalMadeInput').focus();
   }
@@ -3055,9 +3145,11 @@
   function drillShowTimer() {
     document.getElementById('drillTimerDisplay').style.display = 'block';
     document.getElementById('drillIntervalInput').style.display = 'none';
+
     const item = drillItems[drillCurrentItem];
     const shootTime = readPositiveInt('drillShootTime', 1) || 40;
     const intervalTime = readPositiveInt('drillIntervalTime', 0) || 10;
+
     const numEl = document.getElementById('drillTimerNum');
     const kindEl = document.getElementById('drillTimerKind');
     const currentEl = document.getElementById('drillTimerCurrentItem');
@@ -3068,36 +3160,50 @@
       currentEl.textContent = item.area + ' / ' + item.lv + ' ' + item.lvName;
       progressEl.textContent = (drillCurrentItem + 1) + ' / ' + drillItems.length + ' 種目';
       numEl.className = 'drill-timer-num';
+
       let remaining = shootTime;
       numEl.textContent = remaining;
+
       drillTimerId = setInterval(() => {
         remaining--;
         numEl.textContent = remaining;
         if (remaining <= 3 && remaining > 0) beepCountdown();
-        if (remaining <= 0) { clearInterval(drillTimerId); beepTimerEnd(); drillTimerEnd(); }
+        if (remaining <= 0) {
+          clearInterval(drillTimerId);
+          beepTimerEnd();
+          drillTimerEnd();
+        }
       }, 1000);
     } else {
       kindEl.textContent = '🚶 INTERVAL';
       currentEl.textContent = '次：' + (drillCurrentItem < drillItems.length ? drillItems[drillCurrentItem].area + ' / ' + drillItems[drillCurrentItem].lv : '完了');
       progressEl.textContent = '';
       numEl.className = 'drill-timer-num interval';
+
       let remaining = intervalTime;
       numEl.textContent = remaining;
+
       drillTimerId = setInterval(() => {
         remaining--;
         numEl.textContent = remaining;
         if (remaining <= 3 && remaining > 0) beepCountdown();
-        if (remaining <= 0) { clearInterval(drillTimerId); beepTimerEnd(); drillIntervalEnd(); }
+        if (remaining <= 0) {
+          clearInterval(drillTimerId);
+          beepTimerEnd();
+          drillIntervalEnd();
+        }
       }, 1000);
     }
   }
 
   function drillTimerEnd() {
-    try { navigator.vibrate && navigator.vibrate([200,100,200]); } catch(e) {}
+    try {
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    } catch (e) {}
+
     const isLast = drillCurrentItem >= drillItems.length - 1;
     if (drillInputTiming === 'during') {
-      const item = drillItems[drillCurrentItem];
-      drillShowIntervalInput(item, isLast);
+      drillShowIntervalInput(drillItems[drillCurrentItem], isLast);
     } else {
       drillMoveToNextTimedStep();
     }
@@ -3107,22 +3213,40 @@
     const madeInput = document.getElementById('drillIntervalMadeInput');
     madeInput.value = sanitizeDigits(madeInput.value);
     const val = parseInt(madeInput.value, 10);
-    if (isNaN(val) || val < 0) { alert('成功数を入力してください'); return; }
+
+    if (Number.isNaN(val) || val < 0) {
+      alert('成功数を入力してください');
+      return;
+    }
+
     const item = drillItems[drillCurrentItem];
+
     if (item.attempts === null) {
       const attemptsInput = document.getElementById('drillIntervalAttemptsInput');
       attemptsInput.value = sanitizeDigits(attemptsInput.value);
       const att = parseInt(attemptsInput.value, 10);
-      if (isNaN(att) || att <= 0) { alert('試投数を入力してください'); return; }
+      if (Number.isNaN(att) || att <= 0) {
+        alert('試投数を入力してください');
+        return;
+      }
       item.attempts = att;
     }
-    if (item.attempts && val > item.attempts) { alert('成功数が試投数を超えています'); return; }
+
+    if (item.attempts && val > item.attempts) {
+      alert('成功数が試投数を超えています');
+      return;
+    }
+
     item.made = val;
     document.getElementById('drillIntervalInput').style.display = 'none';
     drillMoveToNextTimedStep();
   }
 
-  function drillIntervalEnd() { drillPhase = 'shoot'; drillShowTimer(); }
+  function drillIntervalEnd() {
+    drillPhase = 'shoot';
+    drillShowTimer();
+  }
+
   function drillSkip() {
     if (drillTimerId) {
       clearInterval(drillTimerId);
@@ -3131,55 +3255,83 @@
     if (drillPhase === 'shoot') drillTimerEnd();
     else drillIntervalEnd();
   }
-  function drillFinishFree() { drillGoToInput(); }
+
+  function drillFinishFree() {
+    drillGoToInput();
+  }
 
   function drillGoToInput() {
     drillEnterInput();
     const list = document.getElementById('drillResultInputList');
     let html = '';
+
     drillItems.forEach((item, i) => {
-      html += '<div class="drill-input-item"><div class="drill-input-header"><div class="drill-input-title">' + (i+1) + '. ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '</div>';
+      html += '<div class="drill-input-item"><div class="drill-input-header"><div class="drill-input-title">' + (i + 1) + '. ' + item.area + ' / ' + item.lv + ' ' + item.lvName + '</div>';
       if (item.attempts) {
         html += '<div class="drill-input-attempts">試投：' + item.attempts + '本</div>';
       }
       html += '</div>';
+
       if (!item.attempts) {
         html += '<div style="margin-bottom:6px;font-size:12px;color:var(--text-dim);">試投数</div><input type="tel" inputmode="numeric" pattern="[0-9]*" class="drill-input-field drill-result-attempts" data-idx="' + i + '" min="1" placeholder="0" value="' + (item.attempts ? item.attempts : '') + '" style="margin-bottom:8px;">';
       }
-      html += '<input type="tel" inputmode="numeric" pattern="[0-9]*" class="drill-input-field drill-result-input" data-idx="' + i + '" min="0"' + (item.attempts ? ' max="' + item.attempts + '"' : '') + ' placeholder="0" value="' + (item.made !== null ? item.made : '') + '">';
+
+      html += '<input type="tel" inputmode="numeric" pattern="[0-9]*" class="drill-input-field drill-result-input" data-idx="' + i + '" min="0"' + (item.attempts ? ' max="' + item.attempts + '"' : '') + ' placeholder="0" value="' + (item.made != null ? item.made : '') + '">';
       html += '</div>';
     });
+
     list.innerHTML = html;
     bindDrillNumericInputs(document.getElementById('drillScreen4'));
   }
 
   function drillSubmitAll() {
     if (drillSending) return;
+
     drillClearTimer();
+
     document.querySelectorAll('.drill-result-attempts').forEach(el => {
       el.value = sanitizeDigits(el.value);
       const idx = parseInt(el.dataset.idx, 10);
       drillItems[idx].attempts = parseInt(el.value, 10) || 0;
     });
+
     document.querySelectorAll('.drill-result-input').forEach(el => {
       el.value = sanitizeDigits(el.value);
       const idx = parseInt(el.dataset.idx, 10);
       const val = parseInt(el.value, 10);
-      if (!isNaN(val)) drillItems[idx].made = val;
+      if (!Number.isNaN(val)) drillItems[idx].made = val;
     });
+
     for (let i = 0; i < drillItems.length; i++) {
-      if (!drillItems[i].attempts || drillItems[i].attempts <= 0) { alert((i+1) + '種目目の試投数を入力してください'); return; }
-      if (drillItems[i].made === null || isNaN(drillItems[i].made)) { alert((i+1) + '種目目の成功数を入力してください'); return; }
-      if (drillItems[i].made > drillItems[i].attempts) { alert((i+1) + '種目目の成功数が試投数を超えています'); return; }
+      if (!drillItems[i].attempts || drillItems[i].attempts <= 0) {
+        alert((i + 1) + '種目目の試投数を入力してください');
+        return;
+      }
+      if (drillItems[i].made == null || Number.isNaN(drillItems[i].made)) {
+        alert((i + 1) + '種目目の成功数を入力してください');
+        return;
+      }
+      if (drillItems[i].made > drillItems[i].attempts) {
+        alert((i + 1) + '種目目の成功数が試投数を超えています');
+        return;
+      }
     }
+
     drillSending = true;
     const memo = document.getElementById('drillMemo') ? document.getElementById('drillMemo').value.trim() : '';
     drillEnterSending();
 
     let sendIdx = 0;
+
     function sendNext() {
-      if (sendIdx >= drillItems.length) { drillSending = false; drillShowComplete(); return; }
+      if (sendIdx >= drillItems.length) {
+        drillSending = false;
+        drillShowComplete();
+        return;
+      }
+
       const item = drillItems[sendIdx];
+
       postShotLog({
         mode: 'drill',
         area: item.area,
@@ -3190,21 +3342,34 @@
         order: sendIdx + 1,
         practiceMode: drillPracticeMode,
         shotsMode: drillShotsMode
-      }).then(() => { sendIdx++; sendNext(); }).catch(() => { sendIdx++; sendNext(); });
+      })
+        .then(() => {
+          sendIdx++;
+          sendNext();
+        })
+        .catch(() => {
+          sendIdx++;
+          sendNext();
+        });
     }
+
     sendNext();
   }
 
   function drillShowComplete() {
     drillEnterComplete();
-    let totalAttempts = 0, totalMade = 0;
+
+    let totalAttempts = 0;
+    let totalMade = 0;
     let html = '';
+
     drillItems.forEach(item => {
       const rate = item.attempts > 0 ? Math.round((item.made / item.attempts) * 100) : 0;
       totalAttempts += item.attempts;
       totalMade += item.made;
       html += '📍 ' + item.area + ' / ' + item.lv + '：' + item.made + '/' + item.attempts + '（' + rate + '%）<br>';
     });
+
     const totalRate = totalAttempts > 0 ? Math.round((totalMade / totalAttempts) * 100) : 0;
     html += '<br><strong>合計：' + totalMade + '/' + totalAttempts + '（' + totalRate + '%）</strong>';
     document.getElementById('drillCompleteStats').innerHTML = html;
@@ -3221,187 +3386,193 @@
     drillGoStep(1);
   }
 
-
-
-  // ===== Pair Mode =====
+  // ===== Pair =====
   function pairResetSelectionOnly() {
-  selectedArea = null;
-  selectedShot = null;
-  document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected'));
-  document.querySelectorAll('.shot-btn').forEach(btn => btn.classList.remove('selected'));
-  document.getElementById('btnNext1').disabled = true;
-  document.getElementById('btnNext2').disabled = true;
-  document.getElementById('btnNext2').textContent = '次へ →';
-}
-
-function pairResetSession(keepSelection) {
-  pairResults = [];
-  pairSending = false;
-  if (!keepSelection) pairResetSelectionOnly();
-  const memo = document.getElementById('pairMemoText');
-  if (memo) memo.value = '';
-  pairRenderLive();
-}
-
-function pairRenderLive() {
-  const attempts = pairResults.length;
-  const made = pairResults.filter(Boolean).length;
-  const miss = attempts - made;
-  const rate = attempts > 0 ? Math.round((made / attempts) * 100) : 0;
-
-  const attemptsEl = document.getElementById('pairAttemptsNum');
-  const madeEl = document.getElementById('pairMadeNum');
-  const missEl = document.getElementById('pairMissNum');
-  const rateEl = document.getElementById('pairRateNum');
-
-  if (attemptsEl) attemptsEl.textContent = String(attempts);
-  if (madeEl) madeEl.textContent = String(made);
-  if (missEl) missEl.textContent = String(miss);
-  if (rateEl) rateEl.textContent = rate + '%';
-
-  const historyEl = document.getElementById('pairHistory');
-  if (historyEl) {
-    historyEl.innerHTML = pairResults.length === 0
-      ? 'まだ入力はありません'
-      : pairResults.map(v => '<span class="pair-history-chip">' + (v ? '〇' : '×') + '</span>').join('');
-  }
-}
-
-function pairGoToRecord() {
-  pairResetSession(true);
-  drillCloseActiveScreens();
-  document.querySelector('.steps').style.display = 'none';
-  document.getElementById('stepLabel').style.display = 'block';
-  document.getElementById('stepLabel').textContent = 'PAIR MODE ─ 〇 / × を入力';
-  document.getElementById('pairSummaryArea').textContent = selectedArea || '-';
-  document.getElementById('pairSummaryShot').textContent = selectedShot || '-';
-  document.getElementById('pairScreen3').classList.add('active');
-  pairRenderLive();
-}
-
-function pairMarkResult(isMade) {
-  pairResults.push(!!isMade);
-  pairRenderLive();
-}
-
-function pairUndoLast() {
-  if (pairResults.length === 0) return;
-  pairResults.pop();
-  pairRenderLive();
-}
-
-function pairClearResults() {
-  pairResults = [];
-  pairRenderLive();
-}
-
-function pairBackToShotSelection() {
-  document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-  document.querySelector('.steps').style.display = 'flex';
-  document.getElementById('stepLabel').style.display = 'block';
-  goToScreen(2);
-}
-
-function pairFinishSession() {
-  const attempts = pairResults.length;
-  if (attempts <= 0) {
-    alert('〇または×を1回以上入力してください');
-    return;
+    selectedArea = null;
+    selectedShot = null;
+    document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('.shot-btn').forEach(btn => btn.classList.remove('selected'));
+    document.getElementById('btnNext1').disabled = true;
+    document.getElementById('btnNext2').disabled = true;
+    document.getElementById('btnNext2').textContent = '次へ →';
   }
 
-  const made = pairResults.filter(Boolean).length;
-  const miss = attempts - made;
-  const rate = attempts > 0 ? Math.round((made / attempts) * 100) : 0;
-
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-  document.querySelector('.steps').style.display = 'none';
-  document.getElementById('stepLabel').style.display = 'block';
-  document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
-
-  document.getElementById('pairMemoArea').textContent = selectedArea || '-';
-  document.getElementById('pairMemoShot').textContent = selectedShot || '-';
-  document.getElementById('pairMemoAttempts').textContent = String(attempts);
-  document.getElementById('pairMemoMade').textContent = String(made);
-  document.getElementById('pairMemoMiss').textContent = String(miss);
-  document.getElementById('pairMemoRate').textContent = rate + '%';
-  document.getElementById('pairScreen4').classList.add('active');
-}
-
-function pairBackToRecord() {
-  document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-  document.querySelector('.steps').style.display = 'none';
-  document.getElementById('stepLabel').style.display = 'block';
-  document.getElementById('stepLabel').textContent = 'PAIR MODE ─ 〇 / × を入力';
-  document.getElementById('pairScreen3').classList.add('active');
-  pairRenderLive();
-}
-
-function pairSubmitLog() {
-  if (pairSending) return;
-
-  const attempts = pairResults.length;
-  const made = pairResults.filter(Boolean).length;
-
-  if (attempts <= 0) {
-    alert('試投数が0です。〇または×を入力してください');
-    return;
-  }
-
-  const memo = (document.getElementById('pairMemoText') || { value: '' }).value.trim();
-  const rate = Math.round((made / attempts) * 100);
-
-  pairSending = true;
-  document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('pairScreen5').classList.add('active');
-  document.getElementById('stepLabel').textContent = '';
-
-  postShotLog({
-    mode: 'pair',
-    area: selectedArea,
-    shotType: selectedShot,
-    attempts: attempts,
-    made: made,
-    memo: memo
-  }).then(res => res.json()).then(data => {
+  function pairResetSession(keepSelection) {
+    pairResults = [];
     pairSending = false;
-    if (data.status === 'ok') {
-      pairShowComplete(rate, attempts, made);
-    } else {
-      alert(data.message || '保存に失敗しました');
-      document.getElementById('pairScreen5').classList.remove('active');
-      document.getElementById('pairScreen4').classList.add('active');
-      document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
+    if (!keepSelection) pairResetSelectionOnly();
+    const memo = document.getElementById('pairMemoText');
+    if (memo) memo.value = '';
+    pairRenderLive();
+  }
+
+  function pairRenderLive() {
+    const attempts = pairResults.length;
+    const made = pairResults.filter(Boolean).length;
+    const miss = attempts - made;
+    const rate = attempts > 0 ? Math.round((made / attempts) * 100) : 0;
+
+    const attemptsEl = document.getElementById('pairAttemptsNum');
+    const madeEl = document.getElementById('pairMadeNum');
+    const missEl = document.getElementById('pairMissNum');
+    const rateEl = document.getElementById('pairRateNum');
+
+    if (attemptsEl) attemptsEl.textContent = String(attempts);
+    if (madeEl) madeEl.textContent = String(made);
+    if (missEl) missEl.textContent = String(miss);
+    if (rateEl) rateEl.textContent = rate + '%';
+
+    const historyEl = document.getElementById('pairHistory');
+    if (historyEl) {
+      historyEl.innerHTML = pairResults.length === 0
+        ? 'まだ入力はありません'
+        : pairResults.map(v => '<span class="pair-history-chip">' + (v ? '〇' : '×') + '</span>').join('');
     }
-  .catch(err => {
-    console.error('PAIR POST error:', err);
-    pairSending = false;
-    alert('通信エラーが発生しました。もう一度お試しください。');
-    document.getElementById('pairScreen5').classList.remove('active');
-    document.getElementById('pairScreen4').classList.add('active');
+  }
+
+  function pairGoToRecord() {
+    pairResetSession(true);
+    drillCloseActiveScreens();
+    document.querySelector('.steps').style.display = 'none';
+    document.getElementById('stepLabel').style.display = 'block';
+    document.getElementById('stepLabel').textContent = 'PAIR MODE ─ 〇 / × を入力';
+    document.getElementById('pairSummaryArea').textContent = selectedArea || '-';
+    document.getElementById('pairSummaryShot').textContent = selectedShot || '-';
+    document.getElementById('pairScreen3').classList.add('active');
+    pairRenderLive();
+  }
+
+  function pairMarkResult(isMade) {
+    pairResults.push(!!isMade);
+    pairRenderLive();
+  }
+
+  function pairUndoLast() {
+    if (pairResults.length === 0) return;
+    pairResults.pop();
+    pairRenderLive();
+  }
+
+  function pairClearResults() {
+    pairResults = [];
+    pairRenderLive();
+  }
+
+  function pairBackToShotSelection() {
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.steps').style.display = 'flex';
+    document.getElementById('stepLabel').style.display = 'block';
+    goToScreen(2);
+  }
+
+  function pairFinishSession() {
+    const attempts = pairResults.length;
+    if (attempts <= 0) {
+      alert('〇または×を1回以上入力してください');
+      return;
+    }
+
+    const made = pairResults.filter(Boolean).length;
+    const miss = attempts - made;
+    const rate = attempts > 0 ? Math.round((made / attempts) * 100) : 0;
+
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.steps').style.display = 'none';
+    document.getElementById('stepLabel').style.display = 'block';
     document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
-  });
-}
 
-function pairShowComplete(rate, attempts, made) {
-  const miss = attempts - made;
-  document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('pairScreen6').classList.add('active');
-  document.getElementById('pairCompleteStats').innerHTML =
-    '<strong>' + selectedArea + '</strong> エリア ─ <strong>' + selectedShot + '</strong><br>' +
-    '試投数：<strong>' + attempts + '</strong><br>' +
-    '成功数：<strong>' + made + '</strong><br>' +
-    '失敗数：<strong>' + miss + '</strong><br>' +
-    '<strong>成功率：' + rate + '%</strong>';
-}
+    document.getElementById('pairMemoArea').textContent = selectedArea || '-';
+    document.getElementById('pairMemoShot').textContent = selectedShot || '-';
+    document.getElementById('pairMemoAttempts').textContent = String(attempts);
+    document.getElementById('pairMemoMade').textContent = String(made);
+    document.getElementById('pairMemoMiss').textContent = String(miss);
+    document.getElementById('pairMemoRate').textContent = rate + '%';
+    document.getElementById('pairScreen4').classList.add('active');
+  }
 
-function pairReset() {
-  pairResetSession(false);
-  switchMode('pair');
-}
+  function pairBackToRecord() {
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.querySelector('.steps').style.display = 'none';
+    document.getElementById('stepLabel').style.display = 'block';
+    document.getElementById('stepLabel').textContent = 'PAIR MODE ─ 〇 / × を入力';
+    document.getElementById('pairScreen3').classList.add('active');
+    pairRenderLive();
+  }
 
-bindDrillNumericInputs(document);
+  function pairSubmitLog() {
+    if (pairSending) return;
 
+    const attempts = pairResults.length;
+    const made = pairResults.filter(Boolean).length;
+
+    if (attempts <= 0) {
+      alert('試投数が0です。〇または×を入力してください');
+      return;
+    }
+
+    const memo = (document.getElementById('pairMemoText') || { value: '' }).value.trim();
+    const rate = Math.round((made / attempts) * 100);
+
+    pairSending = true;
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('pairScreen5').classList.add('active');
+    document.getElementById('stepLabel').textContent = '';
+
+    postShotLog({
+      mode: 'pair',
+      area: selectedArea,
+      shotType: selectedShot,
+      attempts: attempts,
+      made: made,
+      memo: memo
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(data => {
+        pairSending = false;
+        if (data && data.status === 'ok') {
+          pairShowComplete(rate, attempts, made);
+        } else {
+          alert((data && data.message) || '保存に失敗しました');
+          document.getElementById('pairScreen5').classList.remove('active');
+          document.getElementById('pairScreen4').classList.add('active');
+          document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
+        }
+      })
+      .catch(err => {
+        console.error('PAIR POST error:', err);
+        pairSending = false;
+        alert('通信エラーが発生しました。もう一度お試しください。');
+        document.getElementById('pairScreen5').classList.remove('active');
+        document.getElementById('pairScreen4').classList.add('active');
+        document.getElementById('stepLabel').textContent = 'PAIR MODE ─ メモ';
+      });
+  }
+
+  function pairShowComplete(rate, attempts, made) {
+    const miss = attempts - made;
+    document.querySelectorAll('.drill-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('pairScreen6').classList.add('active');
+    document.getElementById('pairCompleteStats').innerHTML =
+      '<strong>' + selectedArea + '</strong> エリア ─ <strong>' + selectedShot + '</strong><br>' +
+      '試投数：<strong>' + attempts + '</strong><br>' +
+      '成功数：<strong>' + made + '</strong><br>' +
+      '失敗数：<strong>' + miss + '</strong><br>' +
+      '<strong>成功率：' + rate + '%</strong>';
+  }
+
+  function pairReset() {
+    pairResetSession(false);
+    switchMode('pair');
+  }
+
+  // ===== Init =====
+  initCourtGrid();
+  bindDrillNumericInputs(document);
+  bootLiff();
 </script>
 </body>
 </html>
