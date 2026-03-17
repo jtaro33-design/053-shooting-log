@@ -1807,12 +1807,17 @@
     showScreen('screen1');
   });
 
-  function checkUserStatus(userId) {
-    var callbackName = 'userCheck_' + Date.now();
-    window[callbackName] = function(data) {
+ function checkUserStatus(userId) {
+  var callbackName = 'userCheck_' + Date.now();
+
+  window[callbackName] = function(data) {
+    try {
       delete window[callbackName];
-      document.body.removeChild(script);
-      if (data.status === 'active') {
+      if (script && script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+
+      if (data && data.status === 'active') {
         showScreen('screen1');
         document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
         document.querySelectorAll('.steps')[0].style.display = 'flex';
@@ -1823,21 +1828,49 @@
         document.getElementById('stepLabel').textContent = '';
         document.querySelectorAll('.steps')[0].style.display = 'none';
       }
-    };
-    var script = document.createElement('script');
-    script.src = GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId) + '&callback=' + callbackName;
-    script.onerror = function() {
-      delete window[callbackName];
-      document.body.removeChild(script);
+    } catch (e) {
+      console.error('checkUser callback error:', e);
       showScreen('screen1');
-    };
-    document.body.appendChild(script);
-  }
+      document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
+      document.querySelectorAll('.steps')[0].style.display = 'flex';
+      document.getElementById('bottomNav').style.display = 'flex';
+      document.getElementById('modeToggle').style.display = 'flex';
+    }
+  };
 
-  function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-  }
+  var script = document.createElement('script');
+  script.src = GAS_URL + '?action=checkUser&userId=' + encodeURIComponent(userId) + '&callback=' + callbackName;
+
+  script.onerror = function() {
+    delete window[callbackName];
+    if (script && script.parentNode) {
+      script.parentNode.removeChild(script);
+    }
+    console.error('checkUserStatus JSONP error');
+    showScreen('screen1');
+    document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
+    document.querySelectorAll('.steps')[0].style.display = 'flex';
+    document.getElementById('bottomNav').style.display = 'flex';
+    document.getElementById('modeToggle').style.display = 'flex';
+  };
+
+  document.body.appendChild(script);
+
+  setTimeout(function() {
+    if (window[callbackName]) {
+      delete window[callbackName];
+      if (script && script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+      console.error('checkUserStatus timeout');
+      showScreen('screen1');
+      document.getElementById('stepLabel').textContent = 'STEP 1 ─ エリアを選択';
+      document.querySelectorAll('.steps')[0].style.display = 'flex';
+      document.getElementById('bottomNav').style.display = 'flex';
+      document.getElementById('modeToggle').style.display = 'flex';
+    }
+  }, 5000);
+}
 
   function closeLiff() {
     if (liffReady && liff.isInClient()) {
