@@ -147,6 +147,12 @@
       color:#fff;
     }
 
+    .btn-enable{
+      background:var(--success-soft);
+      color:var(--success);
+      border:1px solid #bbf7d0;
+    }
+
     .btn-danger{
       background:var(--danger-soft);
       color:var(--danger);
@@ -333,6 +339,7 @@
       <div class="toolbar">
         <div class="left">
           <button class="btn-dark" id="approveBtn" onclick="bulkApprove()">一括承認</button>
+          <button class="btn-enable" id="enableBtn" onclick="bulkEnable()">一括有効化</button>
           <button class="btn-danger" onclick="bulkDisable()">一括無効</button>
           <select id="membershipSelect">
             <option value="">会員区分を選択</option>
@@ -413,17 +420,24 @@
       return membership || '';
     }
 
+    function updateToolbarVisibility() {
+      const approveBtn = document.getElementById('approveBtn');
+      const enableBtn = document.getElementById('enableBtn');
+
+      approveBtn.style.display = currentStatus === '仮登録' ? 'inline-block' : 'none';
+      enableBtn.style.display = currentStatus === '無効' ? 'inline-block' : 'none';
+    }
+
     function renderTable(items) {
       const body = document.getElementById('tableBody');
       const countLabel = document.getElementById('countLabel');
-      const approveBtn = document.getElementById('approveBtn');
       const selectAll = document.getElementById('selectAll');
 
       currentItems = items || [];
       countLabel.textContent = currentItems.length + '件';
       selectAll.checked = false;
 
-      approveBtn.style.display = currentStatus === '仮登録' ? 'inline-block' : 'none';
+      updateToolbarVisibility();
 
       if (!currentItems.length) {
         body.innerHTML = '<tr><td colspan="5" class="empty">該当ユーザーはいません。</td></tr>';
@@ -474,6 +488,7 @@
     async function loadUsers() {
       try {
         clearStatus();
+        updateToolbarVisibility();
         renderTable([]);
         document.getElementById('tableBody').innerHTML =
           '<tr><td colspan="5" class="empty">読み込み中です…</td></tr>';
@@ -548,6 +563,31 @@
         loadUsers();
       } else {
         showStatus(result.message || '一括承認に失敗しました。', 'error');
+      }
+    }
+
+    async function bulkEnable() {
+      const pageIds = getSelectedPageIds();
+      if (!pageIds.length) {
+        showStatus('対象ユーザーを選択してください。', 'error');
+        return;
+      }
+
+      const ok = confirm('選択したユーザーを一括有効化します。よろしいですか？');
+      if (!ok) return;
+
+      const result = await postBulkAction({
+        source: 'st_admin_hub',
+        action: 'bulk_update_status',
+        pageIds: pageIds,
+        newStatus: '有効'
+      });
+
+      if (result.status === 'ok') {
+        showStatus('一括有効化が完了しました。', 'success');
+        loadUsers();
+      } else {
+        showStatus(result.message || '一括有効化に失敗しました。', 'error');
       }
     }
 
